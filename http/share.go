@@ -57,6 +57,10 @@ var shareListHandler = withPermShare(func(w http.ResponseWriter, r *http.Request
 })
 
 var shareGetsHandler = withPermShare(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
+	if d.settings.Erugo.Enabled {
+		return renderJSON(w, r, []*share.Link{})
+	}
+
 	var (
 		s   []*share.Link
 		err error
@@ -106,6 +110,14 @@ var sharePostHandler = withPermShare(func(w http.ResponseWriter, r *http.Request
 			return http.StatusBadRequest, fmt.Errorf("failed to decode body: %w", err)
 		}
 		defer r.Body.Close()
+	}
+
+	if d.settings.Erugo.Enabled {
+		s, err := createErugoShare(r.Context(), d, r.URL.Path, body)
+		if err != nil {
+			return errToStatus(err), err
+		}
+		return renderJSON(w, r, s)
 	}
 
 	bytes := make([]byte, 6)

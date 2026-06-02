@@ -10,6 +10,9 @@ interface ISettings {
   branding: SettingsBranding;
   tus: SettingsTus;
   collabora: SettingsCollabora;
+  convertx: SettingsConvertX;
+  erugo: SettingsErugo;
+  clamav: SettingsClamAV;
   shell: string[];
   commands: SettingsCommand;
 }
@@ -50,6 +53,36 @@ interface SettingsCollabora {
   internalURL: string;
   wopiSecret: string;
   tokenTTL: string;
+}
+
+
+interface SettingsConvertX {
+  configured: boolean;
+  enabled: boolean;
+  url: string;
+  apiKey: string;
+  timeout: string;
+}
+
+interface SettingsErugo {
+  configured: boolean;
+  enabled: boolean;
+  url: string;
+  apiKey: string;
+  shareEndpoint: string;
+  defaultExpiryHours: number;
+  timeout: string;
+}
+
+interface SettingsClamAV {
+  enabled: boolean;
+  url: string;
+  scanDepth: number;
+}
+
+interface ClamAVTestResponse {
+  status: string;
+  message: string;
 }
 
 interface SettingsCommand {

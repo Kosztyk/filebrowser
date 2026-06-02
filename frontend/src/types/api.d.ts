@@ -27,6 +27,11 @@ interface Share {
   userID?: number;
   token?: string;
   username?: string;
+  url?: string;
+  name?: string;
+  emailSent?: boolean;
+  externalService?: string;
+  password_hash?: string;
 }
 
 interface SearchParams {

@@ -32,6 +32,9 @@ type Settings struct {
 	Branding              Branding            `json:"branding"`
 	Tus                   Tus                 `json:"tus"`
 	Collabora             Collabora           `json:"collabora"`
+	ConvertX              ConvertX            `json:"convertx"`
+	Erugo                 Erugo               `json:"erugo"`
+	ClamAV                ClamAV              `json:"clamav"`
 	Commands              map[string][]string `json:"commands"`
 	Shell                 []string            `json:"shell"`
 	Rules                 []rules.Rule        `json:"rules"`

@@ -21,6 +21,7 @@ const origin = window.location.origin;
 const tusEndpoint = `/api/tus`;
 const hideLoginButton = window.FileBrowser.HideLoginButton;
 const collaboraEnabled: boolean = window.FileBrowser.CollaboraEnabled;
+const convertXEnabled: boolean = window.FileBrowser.ConvertXEnabled;
 
 export {
   name,
@@ -45,4 +46,5 @@ export {
   tusEndpoint,
   hideLoginButton,
   collaboraEnabled,
+  convertXEnabled,
 };

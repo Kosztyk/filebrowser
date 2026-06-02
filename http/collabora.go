@@ -109,7 +109,7 @@ var collaboraTestHandler = withAdmin(func(w http.ResponseWriter, r *http.Request
 
 	collaboraURL, err := url.Parse(cfg.URL)
 	if cfg.URL == "" || err != nil || collaboraURL.Scheme == "" || collaboraURL.Host == "" {
-		add("collabora_url", "error", "Collabora URL must be a valid absolute URL, for example http://192.168.68.135:9980.")
+		add("collabora_url", "error", "Collabora URL must be a valid absolute URL, for example http://collabora.lan:9980.")
 		return renderCollaboraTest(w, r, checks), nil
 	}
 	if collaboraURL.Scheme != "http" && collaboraURL.Scheme != "https" {

@@ -1,6 +1,10 @@
 package settings
 
 import (
+	"os"
+	"strconv"
+	"strings"
+
 	fberrors "github.com/filebrowser/filebrowser/v2/errors"
 	"github.com/filebrowser/filebrowser/v2/rules"
 	"github.com/filebrowser/filebrowser/v2/users"
@@ -58,7 +62,79 @@ func (s *Storage) Get() (*Settings, error) {
 		set.DirMode = DefaultDirMode
 	}
 
+	if set.ClamAV.URL == "" {
+		set.ClamAV.URL = strings.TrimSpace(os.Getenv("CLAMAV_URL"))
+	}
+	if set.ClamAV.ScanDepth == 0 {
+		if depth, err := strconv.Atoi(strings.TrimSpace(os.Getenv("CLAMAV_SCAN_DEPTH"))); err == nil && depth > 0 {
+			set.ClamAV.ScanDepth = depth
+		}
+	}
+
+	if !set.ConvertX.Configured {
+		if set.ConvertX.URL == "" {
+			set.ConvertX.URL = strings.TrimRight(strings.TrimSpace(firstNonEmptyEnv("FB_CONVERTX_URL", "CONVERTX_URL")), "/")
+		}
+		if set.ConvertX.APIKey == "" {
+			set.ConvertX.APIKey = strings.TrimSpace(firstNonEmptyEnv("FB_CONVERTX_API_KEY", "CONVERTX_API_KEY", "CONVERTX_API_TOKEN"))
+		}
+		if set.ConvertX.Timeout == "" {
+			set.ConvertX.Timeout = strings.TrimSpace(firstNonEmptyEnv("FB_CONVERTX_TIMEOUT", "CONVERTX_TIMEOUT"))
+		}
+		if enabled := strings.TrimSpace(firstNonEmptyEnv("FB_CONVERTX_ENABLED", "CONVERTX_ENABLED")); enabled != "" {
+			if parsed, err := strconv.ParseBool(enabled); err == nil {
+				set.ConvertX.Enabled = parsed
+			}
+		}
+	}
+	if set.ConvertX.Timeout == "" {
+		set.ConvertX.Timeout = "2m"
+	}
+
+	if !set.Erugo.Configured {
+		if set.Erugo.URL == "" {
+			set.Erugo.URL = strings.TrimRight(strings.TrimSpace(firstNonEmptyEnv("FB_ERUGO_URL", "ERUGO_BASE_URL", "ERUGO_URL")), "/")
+		}
+		if set.Erugo.APIKey == "" {
+			set.Erugo.APIKey = strings.TrimSpace(firstNonEmptyEnv("FB_ERUGO_API_KEY", "ERUGO_API_TOKEN", "CONVERTX_INTEGRATION_TOKEN"))
+		}
+		if set.Erugo.ShareEndpoint == "" {
+			set.Erugo.ShareEndpoint = strings.TrimSpace(firstNonEmptyEnv("FB_ERUGO_SHARE_ENDPOINT", "ERUGO_SHARE_ENDPOINT"))
+		}
+		if set.Erugo.Timeout == "" {
+			set.Erugo.Timeout = strings.TrimSpace(firstNonEmptyEnv("FB_ERUGO_TIMEOUT", "ERUGO_TIMEOUT"))
+		}
+		if enabled := strings.TrimSpace(firstNonEmptyEnv("FB_ERUGO_ENABLED", "ERUGO_ENABLED")); enabled != "" {
+			if parsed, err := strconv.ParseBool(enabled); err == nil {
+				set.Erugo.Enabled = parsed
+			}
+		}
+		if hours := strings.TrimSpace(firstNonEmptyEnv("FB_ERUGO_DEFAULT_EXPIRY_HOURS", "ERUGO_DEFAULT_EXPIRY_HOURS")); hours != "" {
+			if parsed, err := strconv.Atoi(hours); err == nil && parsed > 0 {
+				set.Erugo.DefaultExpiryHours = parsed
+			}
+		}
+	}
+	if set.Erugo.ShareEndpoint == "" {
+		set.Erugo.ShareEndpoint = "/api/integrations/convertx/share"
+	}
+	if set.Erugo.DefaultExpiryHours <= 0 {
+		set.Erugo.DefaultExpiryHours = 168
+	}
+	if set.Erugo.Timeout == "" {
+		set.Erugo.Timeout = "2m"
+	}
+
 	return set, nil
+}
+
+func firstNonEmptyEnv(keys ...string) string {
+	for _, key := range keys {
+		if value := os.Getenv(key); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 var defaultEvents = []string{

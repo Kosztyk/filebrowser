@@ -323,6 +323,8 @@ func getSettings(flags *pflag.FlagSet, set *settings.Settings, ser *settings.Ser
 			ser.CollaboraURL, err = flags.GetString(flag.Name)
 		case "collabora.publicURL":
 			ser.CollaboraPublicURL, err = flags.GetString(flag.Name)
+		case "collabora.internalURL":
+			ser.CollaboraInternalURL, err = flags.GetString(flag.Name)
 		case "collabora.wopiSecret":
 			ser.CollaboraWOPISecret, err = flags.GetString(flag.Name)
 		case "collabora.tokenTTL":

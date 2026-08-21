@@ -32,6 +32,9 @@ type Settings struct {
 	Branding              Branding            `json:"branding"`
 	Tus                   Tus                 `json:"tus"`
 	Collabora             Collabora           `json:"collabora"`
+	ConvertX              ConvertX            `json:"convertx"`
+	Erugo                 Erugo               `json:"erugo"`
+	ClamAV                ClamAV              `json:"clamav"`
 	Commands              map[string][]string `json:"commands"`
 	Shell                 []string            `json:"shell"`
 	Rules                 []rules.Rule        `json:"rules"`
@@ -63,27 +66,33 @@ type Collabora struct {
 
 // Server specific settings.
 type Server struct {
-	Root                  string `json:"root"`
-	BaseURL               string `json:"baseURL"`
-	Socket                string `json:"socket"`
-	TLSKey                string `json:"tlsKey"`
-	TLSCert               string `json:"tlsCert"`
-	Port                  string `json:"port"`
-	Address               string `json:"address"`
-	Log                   string `json:"log"`
-	EnableThumbnails      bool   `json:"enableThumbnails"`
-	ResizePreview         bool   `json:"resizePreview"`
-	EnableExec            bool   `json:"enableExec"`
-	TypeDetectionByHeader bool   `json:"typeDetectionByHeader"`
-	ImageResolutionCal    bool   `json:"imageResolutionCalculation"`
-	AuthHook              string `json:"authHook"`
-	TokenExpirationTime   string `json:"tokenExpirationTime"`
-	CollaboraEnabled      bool   `json:"collaboraEnabled"`
-	CollaboraURL          string `json:"collaboraURL"`
-	CollaboraPublicURL    string `json:"collaboraPublicURL"`
-	CollaboraInternalURL  string `json:"collaboraInternalURL"`
-	CollaboraWOPISecret   string `json:"collaboraWOPISecret"`
-	CollaboraTokenTTL     string `json:"collaboraTokenTTL"`
+	Root                   string `json:"root"`
+	BaseURL                string `json:"baseURL"`
+	Socket                 string `json:"socket"`
+	TLSKey                 string `json:"tlsKey"`
+	TLSCert                string `json:"tlsCert"`
+	Port                   string `json:"port"`
+	Address                string `json:"address"`
+	Log                    string `json:"log"`
+	EnableThumbnails       bool   `json:"enableThumbnails"`
+	ResizePreview          bool   `json:"resizePreview"`
+	EnableExec             bool   `json:"enableExec"`
+	TypeDetectionByHeader  bool   `json:"typeDetectionByHeader"`
+	ImageResolutionCal     bool   `json:"imageResolutionCalculation"`
+	AuthHook               string `json:"authHook"`
+	TokenExpirationTime    string `json:"tokenExpirationTime"`
+	CollaboraEnabled       bool   `json:"collaboraEnabled"`
+	CollaboraURL           string `json:"collaboraURL"`
+	CollaboraPublicURL     string `json:"collaboraPublicURL"`
+	CollaboraInternalURL   string `json:"collaboraInternalURL"`
+	CollaboraWOPISecret    string `json:"collaboraWOPISecret"`
+	CollaboraTokenTTL      string `json:"collaboraTokenTTL"`
+	FollowExternalSymlinks bool   `json:"followExternalSymlinks"`
+
+	// CaseInsensitiveFs is detected from Root at startup rather than
+	// configured, and tells the rule checker to match paths case-insensitively.
+	// It is never persisted.
+	CaseInsensitiveFs bool `json:"-"`
 }
 
 // Clean cleans any variables that might need cleaning.

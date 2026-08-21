@@ -1,9 +1,14 @@
 package share
 
 type CreateBody struct {
-	Password string `json:"password"`
-	Expires  string `json:"expires"`
-	Unit     string `json:"unit"`
+	Password               string `json:"password"`
+	Expires                string `json:"expires"`
+	Unit                   string `json:"unit"`
+	Name                   string `json:"name,omitempty"`
+	Description            string `json:"description,omitempty"`
+	RecipientEmail         string `json:"recipientEmail,omitempty"`
+	RecipientName          string `json:"recipientName,omitempty"`
+	DownloadSpeedLimitKbps int    `json:"downloadSpeedLimitKbps,omitempty"`
 }
 
 // Link is the information needed to build a shareable link.

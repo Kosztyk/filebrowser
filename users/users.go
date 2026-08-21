@@ -3,11 +3,10 @@ package users
 import (
 	"path/filepath"
 
-	"github.com/spf13/afero"
-
 	fberrors "github.com/filebrowser/filebrowser/v2/errors"
 	"github.com/filebrowser/filebrowser/v2/files"
 	"github.com/filebrowser/filebrowser/v2/rules"
+	"github.com/spf13/afero"
 )
 
 // ViewMode describes a view mode.
@@ -56,7 +55,7 @@ var checkableFields = []string{
 
 // Clean cleans up a user and verifies if all its fields
 // are alright to be saved.
-func (u *User) Clean(baseScope string, fields ...string) error {
+func (u *User) Clean(baseScope string, followExternalSymlinks bool, fields ...string) error {
 	if len(fields) == 0 {
 		fields = checkableFields
 	}
@@ -93,7 +92,7 @@ func (u *User) Clean(baseScope string, fields ...string) error {
 	if u.Fs == nil {
 		scope := u.Scope
 		scope = filepath.Join(baseScope, filepath.Join("/", scope))
-		u.Fs = afero.NewBasePathFs(afero.NewOsFs(), scope)
+		u.Fs = files.NewFs(afero.NewOsFs(), scope, followExternalSymlinks)
 	}
 
 	return nil
@@ -101,5 +100,5 @@ func (u *User) Clean(baseScope string, fields ...string) error {
 
 // FullPath gets the full path for a user's relative path.
 func (u *User) FullPath(path string) string {
-	return afero.FullBaseFsPath(u.Fs.(*afero.BasePathFs), path)
+	return afero.FullBaseFsPath(files.BasePath(u.Fs), path)
 }

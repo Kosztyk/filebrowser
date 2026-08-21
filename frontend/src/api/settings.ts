@@ -11,6 +11,21 @@ export interface CollaboraTestResponse {
   checks: CollaboraTestCheck[];
 }
 
+export interface ConvertXTestResponse {
+  status: string;
+  message: string;
+}
+
+export interface ErugoTestResponse {
+  status: string;
+  message: string;
+}
+
+export interface ClamAVTestResponse {
+  status: string;
+  message: string;
+}
+
 export function get() {
   return fetchJSON<ISettings>(`/api/settings`, {});
 }
@@ -26,5 +41,26 @@ export async function testCollabora(collabora: SettingsCollabora) {
   return fetchJSON<CollaboraTestResponse>(`/api/collabora/test`, {
     method: "POST",
     body: JSON.stringify({ collabora }),
+  });
+}
+
+export async function testConvertX(config: SettingsConvertX) {
+  return fetchJSON<ConvertXTestResponse>(`/api/settings/convertx/test`, {
+    method: "POST",
+    body: JSON.stringify(config),
+  });
+}
+
+export async function testErugo(config: SettingsErugo) {
+  return fetchJSON<ErugoTestResponse>(`/api/settings/erugo/test`, {
+    method: "POST",
+    body: JSON.stringify(config),
+  });
+}
+
+export async function testClamAV(config: SettingsClamAV) {
+  return fetchJSON<ClamAVTestResponse>(`/api/settings/clamav/test`, {
+    method: "POST",
+    body: JSON.stringify(config),
   });
 }

@@ -18,13 +18,13 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
-	"github.com/spf13/afero"
-
 	fberrors "github.com/filebrowser/filebrowser/v2/errors"
 	"github.com/filebrowser/filebrowser/v2/rules"
+	"github.com/spf13/afero"
 )
 
 var (
@@ -35,22 +35,25 @@ var (
 // FileInfo describes a file.
 type FileInfo struct {
 	*Listing
-	Fs         afero.Fs          `json:"-"`
-	Path       string            `json:"path"`
-	Name       string            `json:"name"`
-	Size       int64             `json:"size"`
-	Extension  string            `json:"extension"`
-	ModTime    time.Time         `json:"modified"`
-	Mode       os.FileMode       `json:"mode"`
-	IsDir      bool              `json:"isDir"`
-	IsSymlink  bool              `json:"isSymlink"`
-	Type       string            `json:"type"`
-	Subtitles  []string          `json:"subtitles,omitempty"`
-	Content    string            `json:"content,omitempty"`
-	Checksums  map[string]string `json:"checksums,omitempty"`
-	Token      string            `json:"token,omitempty"`
-	currentDir []os.FileInfo     `json:"-"`
-	Resolution *ImageResolution  `json:"resolution,omitempty"`
+	Fs               afero.Fs          `json:"-"`
+	Path             string            `json:"path"`
+	Name             string            `json:"name"`
+	Size             int64             `json:"size"`
+	Extension        string            `json:"extension"`
+	ModTime          time.Time         `json:"modified"`
+	Mode             os.FileMode       `json:"mode"`
+	IsDir            bool              `json:"isDir"`
+	IsSymlink        bool              `json:"isSymlink"`
+	Type             string            `json:"type"`
+	Subtitles        []string          `json:"subtitles,omitempty"`
+	Content          string            `json:"content,omitempty"`
+	Checksums        map[string]string `json:"checksums,omitempty"`
+	Token            string            `json:"token,omitempty"`
+	currentDir       []os.FileInfo     `json:"-"`
+	Resolution       *ImageResolution  `json:"resolution,omitempty"`
+	Archive          bool              `json:"archive,omitempty"`
+	ArchivePath      string            `json:"archivePath,omitempty"`
+	ArchiveInnerPath string            `json:"archiveInnerPath,omitempty"`
 }
 
 // FileOptions are the options when getting a file info.
@@ -241,6 +244,9 @@ func (i *FileInfo) detectType(modify, saveContent, readHeader bool, calcImgRes b
 	}
 
 	switch {
+	case IsArchiveName(i.Name):
+		i.Type = "archive"
+		return nil
 	case strings.HasPrefix(mimetype, "video"):
 		i.Type = "video"
 		i.detectSubtitles()
@@ -391,8 +397,7 @@ func (i *FileInfo) addSubtitle(fPath string) {
 }
 
 func (i *FileInfo) readListing(checker rules.Checker, readHeader bool, calcImgRes bool) error {
-	afs := &afero.Afero{Fs: i.Fs}
-	dir, err := afs.ReadDir(i.Path)
+	dir, err := readDir(i.Fs, i.Path)
 	if err != nil {
 		return err
 	}
@@ -414,12 +419,19 @@ func (i *FileInfo) readListing(checker rules.Checker, readHeader bool, calcImgRe
 		isSymlink, isInvalidLink := false, false
 		if IsSymlink(f.Mode()) {
 			isSymlink = true
-			// It's a symbolic link. We try to follow it. If it doesn't work,
-			// we stay with the link information instead of the target's.
+			// It's a symbolic link. We try to follow it. The scoped filesystem
+			// refuses to dereference a link whose target escapes the scope
+			// (permission error); such a link is omitted from the listing
+			// entirely so it cannot leak the target's metadata. Any other
+			// failure means a broken link, which we surface as an invalid link
+			// rather than the target's information.
 			info, err := i.Fs.Stat(fPath)
-			if err == nil {
+			switch {
+			case err == nil:
 				f = info
-			} else {
+			case errors.Is(err, os.ErrPermission):
+				continue
+			default:
 				isInvalidLink = true
 			}
 		}
@@ -466,4 +478,57 @@ func (i *FileInfo) readListing(checker rules.Checker, readHeader bool, calcImgRe
 
 	i.Listing = listing
 	return nil
+}
+
+func readDir(afs afero.Fs, dirname string) ([]os.FileInfo, error) {
+	dir, err := afero.ReadDir(afs, dirname)
+	if err == nil {
+		return dir, nil
+	}
+
+	dir, fallbackErr := readDirNames(afs, dirname)
+	if fallbackErr != nil {
+		return nil, err
+	}
+
+	return dir, nil
+}
+
+func readDirNames(afs afero.Fs, dirname string) ([]os.FileInfo, error) {
+	file, err := afs.Open(dirname)
+	if err != nil {
+		return nil, err
+	}
+
+	names, err := file.Readdirnames(-1)
+	if closeErr := file.Close(); err == nil && closeErr != nil {
+		err = closeErr
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Strings(names)
+	dir := make([]os.FileInfo, 0, len(names))
+	for _, name := range names {
+		fPath := path.Join(dirname, name)
+		info, err := lstatIfPossible(afs, fPath)
+		if err != nil {
+			log.Printf("Skipping inaccessible file %s: %v", fPath, err)
+			continue
+		}
+
+		dir = append(dir, info)
+	}
+
+	return dir, nil
+}
+
+func lstatIfPossible(afs afero.Fs, name string) (os.FileInfo, error) {
+	if lstaterFs, ok := afs.(afero.Lstater); ok {
+		info, _, err := lstaterFs.LstatIfPossible(name)
+		return info, err
+	}
+
+	return afs.Stat(name)
 }

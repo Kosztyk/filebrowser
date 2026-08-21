@@ -42,8 +42,9 @@ export async function upload(
           ? err.originalResponse.getStatus()
           : 0;
 
-        // Do not retry for file conflict.
-        if (status === 409) {
+        // Do not retry client-side failures such as file conflicts,
+        // permission errors, invalid requests, or antivirus blocks.
+        if (status >= 400 && status < 500) {
           return false;
         }
 

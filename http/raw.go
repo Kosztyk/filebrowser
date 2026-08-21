@@ -2,6 +2,7 @@ package fbhttp
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -10,19 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mholt/archives"
-
 	"github.com/filebrowser/filebrowser/v2/files"
 	"github.com/filebrowser/filebrowser/v2/fileutils"
 	"github.com/filebrowser/filebrowser/v2/users"
+	"github.com/mholt/archives"
 )
-
-func slashClean(name string) string {
-	if name == "" || name[0] != '/' {
-		name = "/" + name
-	}
-	return gopath.Clean(name)
-}
 
 func parseQueryFiles(r *http.Request, f *files.FileInfo, _ *users.User) ([]string, error) {
 	var fileSlice []string
@@ -77,6 +70,7 @@ func setContentDisposition(w http.ResponseWriter, r *http.Request, file *files.F
 	} else {
 		// As per RFC6266 section 4.3
 		w.Header().Set("Content-Disposition", "attachment; filename*=utf-8''"+url.PathEscape(file.Name))
+		w.Header().Set("Content-Type", "application/octet-stream")
 	}
 }
 
@@ -125,6 +119,19 @@ func getFiles(d *data, path, commonPath string) ([]archives.FileInfo, error) {
 		nameInArchive := strings.TrimPrefix(path, commonPath)
 		nameInArchive = strings.TrimPrefix(nameInArchive, string(filepath.Separator))
 		nameInArchive = filepath.ToSlash(nameInArchive)
+		// A backslash is a legal filename character on POSIX hosts, so it can
+		// reach here verbatim. Rewriting it to the path separator "/" would
+		// manufacture a traversal sequence (e.g. "..\..\x" -> "../../x") that
+		// escapes the extraction directory on the victim's machine, while
+		// leaving it as "\" lets Windows extractors treat it as a separator.
+		// Neutralize it to an inert character instead of turning it into one.
+		nameInArchive = strings.ReplaceAll(nameInArchive, "\\", "_")
+
+		// Defense in depth: never emit an archive entry whose path escapes the
+		// archive root, regardless of how the name was produced.
+		if cleaned := gopath.Clean("/" + nameInArchive); cleaned != "/"+nameInArchive {
+			return nil, fmt.Errorf("refusing unsafe archive entry name: %q", nameInArchive)
+		}
 
 		archiveFiles = append(archiveFiles, archives.FileInfo{
 			FileInfo:      info,
@@ -218,6 +225,7 @@ func rawFileHandler(w http.ResponseWriter, r *http.Request, file *files.FileInfo
 
 	setContentDisposition(w, r, file)
 	w.Header().Add("Content-Security-Policy", `script-src 'none';`)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private")
 	http.ServeContent(w, r, file.Name, file.ModTime, fd)
 	return 0, nil

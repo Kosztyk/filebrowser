@@ -24,11 +24,13 @@ import NewFile from "./NewFile.vue";
 import NewDir from "./NewDir.vue";
 import Replace from "./Replace.vue";
 import Share from "./Share.vue";
+import ErugoReverseShare from "./ErugoReverseShare.vue";
 import ShareDelete from "./ShareDelete.vue";
 import Upload from "./Upload.vue";
 import DiscardEditorChanges from "./DiscardEditorChanges.vue";
 import ResolveConflict from "./ResolveConflict.vue";
 import CurrentPassword from "./CurrentPassword.vue";
+import Convert from "./Convert.vue";
 
 const layoutStore = useLayoutStore();
 
@@ -46,12 +48,14 @@ const components = new Map<string, any>([
   ["download", Download],
   ["replace", Replace],
   ["share", Share],
+  ["erugo-reverse-share", ErugoReverseShare],
   ["upload", Upload],
   ["share-delete", ShareDelete],
   ["deleteUser", DeleteUser],
   ["discardEditorChanges", DiscardEditorChanges],
   ["resolve-conflict", ResolveConflict],
   ["current-password", CurrentPassword],
+  ["convert", Convert],
 ]);
 
 const modal = computed(() => {

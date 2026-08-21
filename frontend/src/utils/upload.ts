@@ -4,159 +4,146 @@ import url from "@/utils/url";
 import { files as api } from "@/api";
 import { removePrefix } from "@/api/utils";
 
-interface UploadEntryWithChild extends UploadEntry {
-  children?: UploadEntryWithChild[];
-  originalIndex: number;
-}
-
 /**
- * Convert UploadList into a forest (array of root nodes).
- * This properly handles uploads with multiple top-level files/folders
- * instead of assuming a single root.
- * @param flatArray
- * @param basePath
+ * The path used to detect conflicts against the server's recursive listing.
+ *
+ * It MUST be the raw, un-encoded path relative to the destination:
+ *  - `fullPath` is set for folder uploads and drag & drop (e.g. "sub/file.txt").
+ *  - `name` is the leaf for every other case (copy/move/paste/single upload),
+ *    which is always a flat top-level entry.
+ *
+ * We never key on `item.to`: it is URL-encoded (`dest + encodeURIComponent(name)`)
+ * and would miss conflicts for any name with encodable characters (spaces, "#",
+ * non-ASCII, ...), surfacing a raw 409 error instead of the conflict modal.
+ * @param item
  */
-function flatToForest(
-  flatArray: UploadList,
-  basePath: string
-): UploadEntryWithChild[] {
-  const nodeMap: Record<string, UploadEntryWithChild> = {};
+function conflictKey(item: UploadEntry): string {
+  return (item.fullPath || item.name).replace(/^\/+/, "");
+}
 
-  // First pass: create all nodes
-  flatArray.forEach((item, index) => {
-    // File list is created from very different action and info available are not always the same.
-    // By doing a drag and drop or upload a folder (both from the browser or from the OS) we have the fullPath property available
-    // By uploading a single file using the file input, we only have the "name" property
-    // By doing drag and drop from filebrowser to filebrowser, we have the "to" property available but not the fullPath
-    const fullPathOrTo =
-      item.fullPath || item.to?.replace(basePath, "") || item.name;
-    nodeMap[fullPathOrTo!] = {
-      fullPath: fullPathOrTo,
-      isDir: item.isDir,
-      name: item.name,
-      size: item.size,
-      originalIndex: index,
-      ...(item.isDir && { children: [] }),
-      ...(item.file && { file: item.file }),
-    };
-  });
+type ServerConflictEntry = {
+  path: string;
+  name: string;
+  size: number;
+  modified: string;
+};
 
-  const roots: UploadEntryWithChild[] = [];
+async function fetchConflictEntries(
+  basePath: string,
+  recursive: boolean
+): Promise<ServerConflictEntry[]> {
+  if (recursive) {
+    return await api.fetchAll(basePath);
+  }
 
-  // Second pass: build hierarchy
-  flatArray.forEach((item) => {
-    // see comment before to explanation
-    const fullPathOrTo =
-      item.fullPath || item.to?.replace(basePath, "") || item.name;
-
-    const node = nodeMap[fullPathOrTo!];
-    const lastSlash = fullPathOrTo!.lastIndexOf("/");
-
-    if (lastSlash === -1) {
-      roots.push(node);
-    } else {
-      const parentPath = fullPathOrTo!.substring(0, lastSlash);
-      const parent = nodeMap[parentPath];
-      if (parent?.children) {
-        parent.children.push(node);
-      }
-    }
-  });
-
-  return roots;
+  const destination = await api.fetch(basePath);
+  return destination.items ?? [];
 }
 
 /**
- * Return conflict files from
- * @param files  - flat upload list to check
- * @param basePath   - server destination path (e.g. "/files/uploads/")
+ * Whether any entry lands below the destination rather than directly in it.
+ * Only then does conflict detection need the whole destination tree.
+ */
+function hasNestedEntries(files: UploadList): boolean {
+  return files.some((file) => conflictKey(file).includes("/"));
+}
+
+function conflictPath(entry: ServerConflictEntry): string {
+  return entry.path.replace(/\\/g, "/");
+}
+
+function decodePath(path: string): string {
+  return path
+    .split("/")
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    })
+    .join("/");
+}
+
+function buildConflictMap(
+  serverEntries: ServerConflictEntry[],
+  basePath: string,
+  includeDirectories: boolean
+): Map<string, ServerConflictEntry> {
+  const serverMap = new Map<string, ServerConflictEntry>();
+  const normBase = decodePath(removePrefix(basePath)).replace(/\/+$/, "");
+  for (const entry of serverEntries) {
+    // A Windows server may return OS-native backslash separators; normalize to
+    // forward slashes so the prefix strip and key lookup line up.
+    const path = conflictPath(entry);
+    const key = includeDirectories
+      ? entry.name
+      : path.startsWith(normBase)
+        ? path.slice(normBase.length)
+        : path;
+    serverMap.set(key.replace(/^\/+/, ""), entry);
+  }
+
+  return serverMap;
+}
+
+/**
+ * Return the entries from `files` that already exist under `basePath` on the
+ * server, so the caller can prompt the user to overwrite/rename/skip.
+ *
+ * Directory handling differs by action, hence `includeDirectories`:
+ *  - Upload (false): existing folders are silently merged, so only files count.
+ *  - Copy/move (true): these move flat top-level selections, so a same-named
+ *    direct child is the only preflight conflict the backend will reject.
+ *
+ * The destination tree is only walked recursively when an entry actually lands
+ * below the destination (a folder upload). Walking it for a flat upload made
+ * pressing Upload wait on a full server-side walk of the whole subtree before
+ * a single byte was sent, which reads as a frozen UI on a large destination.
+ *
+ * @param files              - flat upload list to check
+ * @param basePath           - server destination path (e.g. "/files/uploads/")
+ * @param includeDirectories - report directories as conflicts (copy/move)
  */
 export async function checkConflict(
   files: UploadList,
-  basePath: string
+  basePath: string,
+  includeDirectories = false
 ): Promise<ConflictingResource[]> {
-  console.log(
-    "Starting conflict check, " + files.length + " possible conflict found."
-  );
+  if (files.length === 0) return [];
 
-  const forest = flatToForest(files, basePath);
-  if (forest.length === 0) return [];
+  const recursive = !includeDirectories && hasNestedEntries(files);
 
-  // Single API call: fetch the entire server tree under basePath.
-  let serverEntries: RecursiveEntry[] = [];
+  let serverEntries: ServerConflictEntry[];
   try {
-    serverEntries = await api.fetchAll(basePath);
+    serverEntries = await fetchConflictEntries(basePath, recursive);
   } catch {
-    console.error(
-      `Failed to fetch recursive server listing for ${basePath}. ` +
-        `Assuming directory doesn't exist and skipping conflict check.`
-    );
+    // The destination doesn't exist yet, so nothing can conflict.
     return [];
   }
 
-  // Build a lookup map keyed by the normalised server path for O(1) access.
-  // The server returns paths relative to the user's scope (e.g. "/uploads/foo.txt").
-  // We strip the basePath prefix so the key matches the upload entry's fullPath.
-  const normBase = removePrefix(basePath).replace(/\/+$/, "");
-  const serverMap = new Map<string, RecursiveEntry>();
-  for (const entry of serverEntries) {
-    // entry.path is absolute from server root, e.g. "/uploads/sub/file.txt"
-    // We need the relative part after normBase, e.g. "sub/file.txt"
-    let rel = entry.path;
-    if (rel.startsWith(normBase)) {
-      rel = rel.slice(normBase.length);
-    }
-    // Strip leading slash so it matches fullPath format ("sub/file.txt")
-    rel = rel.replace(/^\/+/, "");
-    serverMap.set(rel, entry);
-  }
+  const serverMap = buildConflictMap(
+    serverEntries,
+    basePath,
+    includeDirectories
+  );
 
   const conflicts: ConflictingResource[] = [];
+  files.forEach((file, index) => {
+    if (file.isDir && !includeDirectories) return; // see directory note above
 
-  /**
-   * Walk the upload tree and compare each file node against the
-   * pre-fetched server map.  Directories only need to be recursed
-   * when they appear in the map (otherwise no child can conflict).
-   */
-  function recursiveCheckConflict(nodes: UploadEntryWithChild[]): void {
-    for (const node of nodes) {
-      if (node.isDir && node.children) {
-        // Only recurse if this directory exists on the server
-        const dirKey = node.fullPath!.replace(/^\/+/, "");
-        if (serverMap.has(dirKey)) {
-          recursiveCheckConflict(node.children);
-        }
-      } else {
-        // File – check for a conflict against the server map
-        const fileKey = node.fullPath!.replace(/^\/+/, "");
-        const serverEntry = serverMap.get(fileKey);
+    const server = serverMap.get(conflictKey(file));
+    if (!server) return;
 
-        if (serverEntry) {
-          conflicts.push({
-            index: node.originalIndex,
-            name: serverEntry.path,
-            origin: {
-              lastModified: node.file?.lastModified,
-              size: node.size,
-            },
-            dest: {
-              lastModified: serverEntry.modified,
-              size: serverEntry.size,
-            },
-            checked: ["origin"],
-            isSmallerOnServer: node.size > serverEntry.size,
-          });
-        }
-      }
-    }
-  }
-
-  // Walk all root nodes synchronously against the pre-fetched data
-  recursiveCheckConflict(forest);
-
-  console.log(conflicts.length + " conflicts found.");
-
-  conflicts.sort((a, b) => a.index - b.index);
+    conflicts.push({
+      index,
+      name: conflictPath(server),
+      origin: { lastModified: file.file?.lastModified, size: file.size },
+      dest: { lastModified: server.modified, size: server.size },
+      checked: ["origin"],
+      isSmallerOnServer: file.size > server.size,
+    });
+  });
 
   return conflicts;
 }

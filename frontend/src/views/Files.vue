@@ -67,6 +67,7 @@ const isCollaboraOfficeView = computed(() =>
   route.query.office === "true" &&
   collaboraEnabled &&
   !!fileStore.req &&
+  !fileStore.req.archive &&
   !fileStore.req.isDir &&
   collabora.isSupportedExtension(fileStore.req.extension)
 );
@@ -169,7 +170,13 @@ const fetchData = async () => {
   fetchDataController.abort();
   fetchDataController = new AbortController();
   try {
-    const res = await api.fetch(url, fetchDataController.signal);
+    const archiveInner = Array.isArray(route.query.archive)
+      ? route.query.archive[0]
+      : route.query.archive;
+    const res =
+      typeof archiveInner === "string"
+        ? await api.fetchArchive(url, archiveInner, fetchDataController.signal)
+        : await api.fetch(url, fetchDataController.signal);
     fileStore.updateRequest(res);
     document.title = `${res.name || t("sidebar.myFiles")} - ${t("files.files")} - ${name}`;
     layoutStore.loading = false;

@@ -229,9 +229,11 @@ func printSettings(ser *settings.Server, set *settings.Settings, auther auth.Aut
 	fmt.Fprintf(w, "\tThumbnails Enabled:\t%t\n", ser.EnableThumbnails)
 	fmt.Fprintf(w, "\tResize Preview:\t%t\n", ser.ResizePreview)
 	fmt.Fprintf(w, "\tType Detection by Header:\t%t\n", ser.TypeDetectionByHeader)
+	fmt.Fprintf(w, "\tFollow External Symlinks:\t%t\n", ser.FollowExternalSymlinks)
 	fmt.Fprintf(w, "\tCollabora Enabled:\t%t\n", ser.CollaboraEnabled)
 	fmt.Fprintf(w, "\tCollabora URL:\t%s\n", ser.CollaboraURL)
 	fmt.Fprintf(w, "\tCollabora Public URL:\t%s\n", ser.CollaboraPublicURL)
+	fmt.Fprintf(w, "\tCollabora Internal URL:\t%s\n", ser.CollaboraInternalURL)
 	fmt.Fprintf(w, "\tCollabora Token TTL:\t%s\n", ser.CollaboraTokenTTL)
 
 	fmt.Fprintln(w, "\nTUS:")
@@ -317,12 +319,16 @@ func getSettings(flags *pflag.FlagSet, set *settings.Settings, ser *settings.Ser
 		case "disableImageResolutionCalc":
 			ser.ImageResolutionCal, err = flags.GetBool(flag.Name)
 			ser.ImageResolutionCal = !ser.ImageResolutionCal
+		case "followExternalSymlinks":
+			ser.FollowExternalSymlinks, err = flags.GetBool(flag.Name)
 		case "collabora.enabled":
 			ser.CollaboraEnabled, err = flags.GetBool(flag.Name)
 		case "collabora.url":
 			ser.CollaboraURL, err = flags.GetString(flag.Name)
 		case "collabora.publicURL":
 			ser.CollaboraPublicURL, err = flags.GetString(flag.Name)
+		case "collabora.internalURL":
+			ser.CollaboraInternalURL, err = flags.GetString(flag.Name)
 		case "collabora.wopiSecret":
 			ser.CollaboraWOPISecret, err = flags.GetString(flag.Name)
 		case "collabora.tokenTTL":

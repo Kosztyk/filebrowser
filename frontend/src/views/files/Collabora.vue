@@ -37,6 +37,7 @@
       :key="editorUrl"
       :src="editorUrl"
       allow="clipboard-read; clipboard-write; fullscreen"
+      ref="collaboraFrame"
       referrerpolicy="no-referrer-when-downgrade"
     ></iframe>
 
@@ -73,12 +74,15 @@ const editorUrl = ref("");
 const errorMessage = ref("");
 const title = ref("Collabora");
 const isNativeFullscreen = ref(false);
+const collaboraFrame = ref<HTMLIFrameElement | null>(null);
+const postMessageReadySent = ref(false);
 
 const loadEditor = async () => {
   if (!fileStore.req) return;
 
   editorUrl.value = "";
   errorMessage.value = "";
+  postMessageReadySent.value = false;
   layoutStore.loading = true;
 
   try {
@@ -102,15 +106,35 @@ const close = () => {
   router.push({ path: uri });
 };
 
-const handleCollaboraMessage = (event: MessageEvent) => {
-  if (!editorUrl.value) return;
+const getCollaboraOrigin = (): string | null => {
+  if (!editorUrl.value) return null;
 
   try {
-    const editorOrigin = new URL(editorUrl.value).origin;
-    if (event.origin !== editorOrigin) return;
+    return new URL(editorUrl.value).origin;
   } catch {
-    return;
+    return null;
   }
+};
+
+const sendHostPostmessageReady = () => {
+  if (postMessageReadySent.value) return;
+
+  const frameWindow = collaboraFrame.value?.contentWindow;
+  const editorOrigin = getCollaboraOrigin();
+  if (!frameWindow || !editorOrigin) return;
+
+  frameWindow.postMessage(
+    JSON.stringify({ MessageId: "Host_PostmessageReady" }),
+    editorOrigin
+  );
+  postMessageReadySent.value = true;
+};
+
+const handleCollaboraMessage = (event: MessageEvent) => {
+  const frameWindow = collaboraFrame.value?.contentWindow;
+  const editorOrigin = getCollaboraOrigin();
+  if (!frameWindow || !editorOrigin) return;
+  if (event.source !== frameWindow || event.origin !== editorOrigin) return;
 
   let data: any = event.data;
   if (typeof data === "string") {
@@ -122,6 +146,13 @@ const handleCollaboraMessage = (event: MessageEvent) => {
   }
 
   const messageId = data?.MessageId ?? data?.messageId ?? data?.type;
+  if (messageId === "App_LoadingStatus") {
+    const status = data?.Values?.Status ?? data?.values?.status;
+    if (["Frame_Ready", "Document_Loaded"].includes(status)) {
+      sendHostPostmessageReady();
+    }
+  }
+
   if (["UI_Close", "UI_CloseClicked", "close", "Close"].includes(messageId)) {
     close();
   }

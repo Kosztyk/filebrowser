@@ -2,6 +2,163 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.63.23](https://github.com/filebrowser/filebrowser/compare/v2.63.22...v2.63.23) (2026-07-27)
+## [2.63.22](https://github.com/filebrowser/filebrowser/compare/v2.63.21...v2.63.22) (2026-07-27)
+
+### Bug Fixes
+
+* enforce rules on recursive operations and expired proxy tokens ([#6053](https://github.com/filebrowser/filebrowser/issues/6053)) ([72faf6d](https://github.com/filebrowser/filebrowser/commit/72faf6dd3c85628e332d3e567124b86708ce2695))
+* make the sidebar scrollable when content overflows ([#6031](https://github.com/filebrowser/filebrowser/issues/6031)) ([a789f29](https://github.com/filebrowser/filebrowser/commit/a789f29ceec4734e7471592921d1ce67f1a10a7e))
+* unblock stalled and frozen uploads ([0b925cb](https://github.com/filebrowser/filebrowser/commit/0b925cbca940fe0b2726827cf66783da05c64f5e)), closes [#6006](https://github.com/filebrowser/filebrowser/issues/6006), references [#5987](https://github.com/filebrowser/filebrowser/issues/5987)
+* use absolute URLs for the PWA manifest icon sources ([#6032](https://github.com/filebrowser/filebrowser/issues/6032)) ([cfff843](https://github.com/filebrowser/filebrowser/commit/cfff84306af66deedfdc9248300919b3ddd9a7f0))
+## [2.63.21](https://github.com/filebrowser/filebrowser/compare/v2.63.20...v2.63.21) (2026-07-26)
+
+### Bug Fixes
+
+* **http:** canonicalize paths before checking access rules ([#6045](https://github.com/filebrowser/filebrowser/issues/6045)) ([e6d70cf](https://github.com/filebrowser/filebrowser/commit/e6d70cf24c0cd79a1787601dc99104ec7e7ca3ef))
+
+### Reverts
+
+* Revert "chore(deps): update all non-major dependencies (#5946)" ([0dd8905](https://github.com/filebrowser/filebrowser/commit/0dd89058867f87a7bc04aa7517d21528a280e27c)), references [#5946](https://github.com/filebrowser/filebrowser/issues/5946)
+## [2.63.20](https://github.com/filebrowser/filebrowser/compare/v2.63.19...v2.63.20) (2026-07-25)
+
+### Bug Fixes
+
+* use aria-selected ([67e893e](https://github.com/filebrowser/filebrowser/commit/67e893eee7ee411e166d3fcd759a87b6f0971277))
+* **users:** make the provisioned scope check atomic with the save ([fb6aeba](https://github.com/filebrowser/filebrowser/commit/fb6aeba9eae7b8eb401e0db325973781e1ffd08b))
+## [2.63.19](https://github.com/filebrowser/filebrowser/compare/v2.63.18...v2.63.19) (2026-07-25)
+
+### Bug Fixes
+
+* accessibility and security improvements ([#6033](https://github.com/filebrowser/filebrowser/issues/6033)) ([b21b124](https://github.com/filebrowser/filebrowser/commit/b21b1245ae1b57f031b2f5d787f32a17532402c0))
+* **auth:** isolate auto-provisioned proxy and hook users to their own home ([8ddd3d1](https://github.com/filebrowser/filebrowser/commit/8ddd3d1db9b9f5727d0bf96ea0e7d9a25a8692b4))
+* **http:** delete abandoned TUS uploads through the scoped filesystem ([9bd79c3](https://github.com/filebrowser/filebrowser/commit/9bd79c3aaeb4a55b0e69cf8976c4a258db2f5e06))
+* **http:** enforce declared Upload-Length on TUS uploads ([4daddec](https://github.com/filebrowser/filebrowser/commit/4daddec6f200b03a721197d8c0b4b652c994894e))
+* **http:** enforce download permission on the checksum branch ([6c69b5c](https://github.com/filebrowser/filebrowser/commit/6c69b5cd895e15b29e563200a9a6dfc27b06525e))
+* **http:** run upload hooks for directories ([#6034](https://github.com/filebrowser/filebrowser/issues/6034)) ([9b78324](https://github.com/filebrowser/filebrowser/commit/9b78324d773c790951cc6a97840c4b55f66b5f3d))
+* process --FollowExternalSymlinks ([c05c668](https://github.com/filebrowser/filebrowser/commit/c05c66814891c3cccef394162e428444b53394e4))
+* return error instead of panicking on an unreadable directory during copy ([#6020](https://github.com/filebrowser/filebrowser/issues/6020)) ([ac46cf0](https://github.com/filebrowser/filebrowser/commit/ac46cf06719575477d5125e7472037c204b3702d))
+* **storage:** reject case-folded home directory collisions ([4b8a8d7](https://github.com/filebrowser/filebrowser/commit/4b8a8d72ce554dde378b5091da74aa930ea18327))
+* **upload:** handle encoded path conflicts safely ([#6040](https://github.com/filebrowser/filebrowser/issues/6040)) ([7361d91](https://github.com/filebrowser/filebrowser/commit/7361d91ea2e8cc200a0f40ac84adcd02aedc9ed2))
+## [2.63.18](https://github.com/filebrowser/filebrowser/compare/v2.63.17...v2.63.18) (2026-07-04)
+
+
+### Bug Fixes
+
+* avoid recursive conflict checks for copy and move ([#6009](https://github.com/filebrowser/filebrowser/issues/6009)) ([dfc2e88](https://github.com/filebrowser/filebrowser/commit/dfc2e887e1a19d54984a0d7e39a2a63caf73ef19))
+* deduplicate PT language ([4470288](https://github.com/filebrowser/filebrowser/commit/4470288ba1828a14453a99348fd22c62aa0b9460))
+* **preview:** keep the EPUB table-of-contents button clear of the header ([#6010](https://github.com/filebrowser/filebrowser/issues/6010)) ([aac2516](https://github.com/filebrowser/filebrowser/commit/aac25166378422135e624e305c410c54a39374fb))
+
+## [2.63.17](https://github.com/filebrowser/filebrowser/compare/v2.63.16...v2.63.17) (2026-06-27)
+
+
+### Bug Fixes
+
+* **auth:** reject signup when normalized home dir collides (GHSA-7rc3-g7h6-22m7) ([883a36f](https://github.com/filebrowser/filebrowser/commit/883a36f02fcb69566a8628cb47f18fdc73348387))
+* match admin share paths by owner scope ([#5992](https://github.com/filebrowser/filebrowser/issues/5992)) ([43a404c](https://github.com/filebrowser/filebrowser/commit/43a404ca69bf25553bfbbb2b446f0f53077c6302))
+* normalize recursive listing paths to forward slashes ([#6003](https://github.com/filebrowser/filebrowser/issues/6003)) ([2472fbc](https://github.com/filebrowser/filebrowser/commit/2472fbcd30502606feb11fbc8b8dc4f3803e6641))
+* preserve SRT subtitle line breaks ([#6002](https://github.com/filebrowser/filebrowser/issues/6002)) ([d9cf2f0](https://github.com/filebrowser/filebrowser/commit/d9cf2f0100d2c4892cad8e339eacca96df1aa5b6))
+* **raw:** neutralize backslashes in archive entry names (GHSA-83xp-526h-j3ww) ([8503ba6](https://github.com/filebrowser/filebrowser/commit/8503ba61ff51d48a7313896483d130eb6a5abfe0))
+* **share:** delete exact directory share on trailing-slash delete (GHSA-pp88-jhwj-5qh5) ([f30fca6](https://github.com/filebrowser/filebrowser/commit/f30fca636c1af9ef401e9a82ff60391cb3db97e1))
+* **share:** stop exposing password hash and bypass token in share API (GHSA-833g-cqhp-h72j) ([ec13054](https://github.com/filebrowser/filebrowser/commit/ec130546713c44cd24556907552ac554c7f809c9))
+
+## [2.63.16](https://github.com/filebrowser/filebrowser/compare/v2.63.15...v2.63.16) (2026-06-23)
+
+
+### Bug Fixes
+
+* dangling symlink, write, delete scope bugs ([64511ce](https://github.com/filebrowser/filebrowser/commit/64511ce45e3be379e965f7f4fb0929a068d5bb81))
+* restore symlink behavior as opt-in followExternalSymlinks ([a106392](https://github.com/filebrowser/filebrowser/commit/a1063925e15ef27f9d5dc26aae371bbf52af608c))
+
+## [2.63.15](https://github.com/filebrowser/filebrowser/compare/v2.63.14...v2.63.15) (2026-06-13)
+
+
+### Bug Fixes
+
+* restore ScopedFs RealPath ([#5986](https://github.com/filebrowser/filebrowser/issues/5986)) ([403d2bb](https://github.com/filebrowser/filebrowser/commit/403d2bbd3357aa57e78745b52dcdad3490901bb3))
+
+## [2.63.14](https://github.com/filebrowser/filebrowser/compare/v2.63.13...v2.63.14) (2026-06-07)
+
+
+### Bug Fixes
+
+* recursive check ([3406d3d](https://github.com/filebrowser/filebrowser/commit/3406d3d7f98dfc3c16e4ff7ff4a87e3bdfe221dd))
+
+
+### Refactorings
+
+* ScopedFs to avoid escaping symlinks ([7c2c0a1](https://github.com/filebrowser/filebrowser/commit/7c2c0a11b31b2bb214d741005a0b02b1764208b3))
+
+## [2.63.13](https://github.com/filebrowser/filebrowser/compare/v2.63.12...v2.63.13) (2026-06-06)
+
+
+### Bug Fixes
+
+* copy/move allow overwrite ([a1a514d](https://github.com/filebrowser/filebrowser/commit/a1a514dcbb216d2080412c5354eea1e1fb033050))
+
+
+### Refactorings
+
+* cleanup and simplify upload.ts ([5f7311d](https://github.com/filebrowser/filebrowser/commit/5f7311d32437e98d7c14c7b307a4f68109275535))
+
+## [2.63.12](https://github.com/filebrowser/filebrowser/compare/v2.63.11...v2.63.12) (2026-06-04)
+
+
+### Bug Fixes
+
+* await copy move conflict detection ([#5978](https://github.com/filebrowser/filebrowser/issues/5978)) ([c1abe8f](https://github.com/filebrowser/filebrowser/commit/c1abe8f561208bf36bde70879d1a15ef9de998fa))
+* keep mobile file sort controls visible ([#5977](https://github.com/filebrowser/filebrowser/issues/5977)) ([0bb2768](https://github.com/filebrowser/filebrowser/commit/0bb2768754d11b865d68e72dcd7cebb232a6308a))
+* skip inaccessible children when listing directories ([#5958](https://github.com/filebrowser/filebrowser/issues/5958)) ([7b7ff8a](https://github.com/filebrowser/filebrowser/commit/7b7ff8ae8f97393b2e6ae6e061c1f780077c32b6))
+
+## [2.63.11](https://github.com/filebrowser/filebrowser/compare/v2.63.10...v2.63.11) (2026-06-04)
+
+
+### Bug Fixes
+
+* incomplete fix for symlinked directories let scopes users and public-share recipients read and write files outside of scope ([3471ec2](https://github.com/filebrowser/filebrowser/commit/3471ec2c4b6473831c72ee889cb3c1a6849a1fb1))
+
+## [2.63.10](https://github.com/filebrowser/filebrowser/compare/v2.63.9...v2.63.10) (2026-06-03)
+
+
+### Bug Fixes
+
+* allow writes when user scope resolves to filesystem root ([6b04cbf](https://github.com/filebrowser/filebrowser/commit/6b04cbf5e9db1f5b9c0b1624843607ce2881cfc4))
+
+## [2.63.9](https://github.com/filebrowser/filebrowser/compare/v2.63.8...v2.63.9) (2026-06-03)
+
+
+### Bug Fixes
+
+* force octet-stream for attachment downloads ([#5942](https://github.com/filebrowser/filebrowser/issues/5942)) ([103acd1](https://github.com/filebrowser/filebrowser/commit/103acd15fe57554fe0246bfe70a49b6cb4ae0c51))
+* prevent symlink scope escape in copy/move/rename ([cdd666f](https://github.com/filebrowser/filebrowser/commit/cdd666fc95f569ad583c32391e45646fed676dfd))
+* set X-Content-Type-Options: nosniff on raw file responses ([35db07d](https://github.com/filebrowser/filebrowser/commit/35db07d0159c520a6b3c969ac52033593914fadd))
+* use constant-time comparison for share access token ([1951436](https://github.com/filebrowser/filebrowser/commit/19514367adf2d9fe5be2b7666e397979ea679b94))
+
+## [2.63.8](https://github.com/filebrowser/filebrowser/compare/v2.63.7...v2.63.8) (2026-06-03)
+
+
+### Bug Fixes
+
+* check if share is within scope when creating ([ca019ae](https://github.com/filebrowser/filebrowser/commit/ca019ae7d966a7c28de2b2341271cd13e3458ae6))
+
+## [2.63.7](https://github.com/filebrowser/filebrowser/compare/v2.63.6...v2.63.7) (2026-06-03)
+
+
+### Bug Fixes
+
+* disallow shares for non-existent paths ([166583d](https://github.com/filebrowser/filebrowser/commit/166583db632e088e9f0adce30aec43bb9d9019f4))
+
+## [2.63.6](https://github.com/filebrowser/filebrowser/compare/v2.63.5...v2.63.6) (2026-06-03)
+
+
+### Bug Fixes
+
+* address three security disclosures (archive traversal, login DoS, symlink escape) ([847d08b](https://github.com/filebrowser/filebrowser/commit/847d08bdd135e5c3659f2e6dea2f0cd36617af9b))
+* cross-user unauthorized share-link deletion ([0231b7e](https://github.com/filebrowser/filebrowser/commit/0231b7ebdfbe77a6c54027d30c4856c3fd81ee4d))
+* incorrect access control in public directory shares via rule path rebasing ([e07c59d](https://github.com/filebrowser/filebrowser/commit/e07c59df0b850f5924d5b1683e8609661ddcf534))
+* parse csv files with uneven columns in their rows ([#5965](https://github.com/filebrowser/filebrowser/issues/5965)) ([5328e80](https://github.com/filebrowser/filebrowser/commit/5328e80d2e88d1c279a1250a7dfee4fc96f703ec))
+* remove undocumented hook auth with shell replacement ([34ae34e](https://github.com/filebrowser/filebrowser/commit/34ae34e764d72540c039f1f5ea2ec4c974168c1f))
+
 ## [2.63.5](https://github.com/filebrowser/filebrowser/compare/v2.63.4...v2.63.5) (2026-05-21)
 
 

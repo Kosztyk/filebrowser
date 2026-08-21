@@ -5,7 +5,9 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/spf13/afero"
 
+	"github.com/filebrowser/filebrowser/v2/files"
 	"github.com/filebrowser/filebrowser/v2/settings"
 	"github.com/filebrowser/filebrowser/v2/storage"
 )
@@ -25,6 +27,7 @@ func NewHandler(
 	assetsFs fs.FS,
 ) (http.Handler, error) {
 	server.Clean()
+	server.CaseInsensitiveFs = files.CaseInsensitive(afero.NewOsFs(), server.Root)
 
 	r := mux.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
@@ -62,6 +65,17 @@ func NewHandler(
 	users.Handle("/{id:[0-9]+}", monkey(userGetHandler, "")).Methods("GET")
 	users.Handle("/{id:[0-9]+}", monkey(userDeleteHandler, "")).Methods("DELETE")
 
+	api.PathPrefix("/archive/resources").Handler(monkey(archiveResourceHandler, "/api/archive/resources")).Methods("GET")
+	api.PathPrefix("/archive/raw").Handler(monkey(archiveRawHandler, "/api/archive/raw")).Methods("GET")
+	api.PathPrefix("/archive/extract").Handler(monkey(archiveExtractHandler, "/api/archive/extract")).Methods("POST")
+	api.Handle("/archive/create", monkey(archiveCreateHandler, "")).Methods("POST")
+	api.PathPrefix("/archive/jobs").Handler(monkey(archiveCreateJobStatusHandler, "/api/archive/jobs")).Methods("GET")
+	api.PathPrefix("/clamav/jobs").Handler(monkey(clamAVScanJobStatusHandler, "/api/clamav/jobs")).Methods("GET")
+	api.PathPrefix("/clamav/scan").Handler(monkey(clamAVPathScanHandler, "/api/clamav/scan")).Methods("POST")
+	api.Handle("/convertx/targets", monkey(convertXTargetsHandler, "")).Methods("GET")
+	api.Handle("/convertx/convert", monkey(convertXConvertHandler, "")).Methods("POST")
+	api.PathPrefix("/convertx/jobs").Handler(monkey(convertXConversionJobStatusHandler, "/api/convertx/jobs")).Methods("GET")
+
 	api.PathPrefix("/resources/recursive").Handler(monkey(resourceGetRecursiveHandler, "/api/resources/recursive")).Methods("GET")
 	api.PathPrefix("/resources").Handler(monkey(resourceGetHandler, "/api/resources")).Methods("GET")
 	api.PathPrefix("/resources").Handler(monkey(resourceDeleteHandler(fileCache), "/api/resources")).Methods("DELETE")
@@ -77,12 +91,17 @@ func NewHandler(
 	api.PathPrefix("/usage").Handler(monkey(diskUsage, "/api/usage")).Methods("GET")
 
 	api.Handle("/shares", monkey(shareListHandler, "")).Methods("GET")
+	api.Handle("/share-config", monkey(erugoShareConfigHandler, "")).Methods("GET")
+	api.Handle("/erugo/reverse-share", monkey(erugoReverseShareHandler, "")).Methods("POST")
 	api.PathPrefix("/share").Handler(monkey(shareGetsHandler, "/api/share")).Methods("GET")
 	api.PathPrefix("/share").Handler(monkey(sharePostHandler, "/api/share")).Methods("POST")
 	api.PathPrefix("/share").Handler(monkey(shareDeleteHandler, "/api/share")).Methods("DELETE")
 
 	api.Handle("/settings", monkey(settingsGetHandler, "")).Methods("GET")
 	api.Handle("/settings", monkey(settingsPutHandler, "")).Methods("PUT")
+	api.Handle("/settings/clamav/test", monkey(settingsClamAVTestHandler, "")).Methods("POST")
+	api.Handle("/settings/convertx/test", monkey(settingsConvertXTestHandler, "")).Methods("POST")
+	api.Handle("/settings/erugo/test", monkey(settingsErugoTestHandler, "")).Methods("POST")
 
 	api.PathPrefix("/raw").Handler(monkey(rawHandler, "/api/raw")).Methods("GET")
 	api.PathPrefix("/preview/{size}/{path:.*}").

@@ -2,6 +2,8 @@ package fbhttp
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 
 	"github.com/filebrowser/filebrowser/v2/rules"
@@ -20,6 +22,9 @@ type settingsData struct {
 	Branding              settings.Branding     `json:"branding"`
 	Tus                   settings.Tus          `json:"tus"`
 	Collabora             settings.Collabora    `json:"collabora"`
+	ConvertX              settings.ConvertX     `json:"convertx"`
+	Erugo                 settings.Erugo        `json:"erugo"`
+	ClamAV                settings.ClamAV       `json:"clamav"`
 	Shell                 []string              `json:"shell"`
 	Commands              map[string][]string   `json:"commands"`
 }
@@ -37,6 +42,9 @@ var settingsGetHandler = withAdmin(func(w http.ResponseWriter, r *http.Request, 
 		Branding:              d.settings.Branding,
 		Tus:                   d.settings.Tus,
 		Collabora:             d.collaboraConfig(),
+		ConvertX:              d.settings.ConvertX,
+		Erugo:                 d.settings.Erugo,
+		ClamAV:                d.settings.ClamAV,
 		Shell:                 d.settings.Shell,
 		Commands:              d.settings.Commands,
 	}
@@ -61,10 +69,57 @@ var settingsPutHandler = withAdmin(func(_ http.ResponseWriter, r *http.Request, 
 	d.settings.Tus = req.Tus
 	req.Collabora.Configured = true
 	d.settings.Collabora = req.Collabora
+	req.ConvertX.Configured = true
+	d.settings.ConvertX = req.ConvertX
+	req.Erugo.Configured = true
+	d.settings.Erugo = req.Erugo
+	d.settings.ClamAV = req.ClamAV
 	d.settings.Shell = req.Shell
 	d.settings.Commands = req.Commands
 	d.settings.HideLoginButton = req.HideLoginButton
 
 	err = d.store.Settings.Save(d.settings)
 	return errToStatus(err), err
+})
+
+var settingsClamAVTestHandler = withAdmin(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
+	cfg := d.settings.ClamAV
+
+	if r.Body != nil {
+		defer r.Body.Close()
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&cfg); err != nil && !errors.Is(err, io.EOF) {
+			return http.StatusBadRequest, err
+		}
+	}
+
+	if err := testClamAVConnection(r.Context(), cfg); err != nil {
+		return clamAVHTTPStatus(err), err
+	}
+
+	return renderJSON(w, r, map[string]string{
+		"status":  "OK",
+		"message": "ClamAV connection successful",
+	})
+})
+
+var settingsConvertXTestHandler = withAdmin(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
+	cfg := d.settings.ConvertX
+
+	if r.Body != nil {
+		defer r.Body.Close()
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&cfg); err != nil && !errors.Is(err, io.EOF) {
+			return http.StatusBadRequest, err
+		}
+	}
+
+	if err := testConvertXConnection(r.Context(), cfg); err != nil {
+		return http.StatusBadGateway, err
+	}
+
+	return renderJSON(w, r, map[string]string{
+		"status":  "OK",
+		"message": "ConvertX connection successful",
+	})
 })

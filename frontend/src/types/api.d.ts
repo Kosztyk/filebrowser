@@ -25,8 +25,13 @@ interface Share {
   path: string;
   expire?: any;
   userID?: number;
-  token?: string;
+  hasPassword?: boolean;
   username?: string;
+  url?: string;
+  name?: string;
+  emailSent?: boolean;
+  externalService?: string;
+  downloadSpeedLimitKbps?: number;
 }
 
 interface SearchParams {

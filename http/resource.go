@@ -15,12 +15,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shirou/gopsutil/v4/disk"
-	"github.com/spf13/afero"
-
 	fberrors "github.com/filebrowser/filebrowser/v2/errors"
 	"github.com/filebrowser/filebrowser/v2/files"
 	"github.com/filebrowser/filebrowser/v2/fileutils"
+	"github.com/shirou/gopsutil/v4/disk"
+	"github.com/spf13/afero"
 )
 
 var resourceGetHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
@@ -68,6 +67,10 @@ var resourceGetHandler = withUser(func(w http.ResponseWriter, r *http.Request, d
 	}
 
 	if checksum := r.URL.Query().Get("checksum"); checksum != "" {
+		if !d.user.Perm.Download {
+			return http.StatusAccepted, nil
+		}
+
 		err := file.Checksum(checksum)
 		if errors.Is(err, fberrors.ErrInvalidOption) {
 			return http.StatusBadRequest, nil
@@ -100,7 +103,11 @@ func resourceDeleteHandler(fileCache FileCache) handleFunc {
 			return errToStatus(err), err
 		}
 
-		err = d.store.Share.DeleteWithPathPrefix(file.Path)
+		if err = checkDescendants(d, r.URL.Path, ""); err != nil {
+			return errToStatus(err), err
+		}
+
+		err = d.store.Share.DeleteWithPathPrefix(file.Path, d.user.ID)
 		if err != nil {
 			log.Printf("WARNING: Error(s) occurred while deleting associated shares with file: %s", err)
 		}
@@ -131,7 +138,9 @@ func resourcePostHandler(fileCache FileCache) handleFunc {
 
 		// Directories creation on POST.
 		if strings.HasSuffix(r.URL.Path, "/") {
-			err := d.user.Fs.MkdirAll(r.URL.Path, d.settings.DirMode)
+			err := d.RunHook(func() error {
+				return d.user.Fs.MkdirAll(r.URL.Path, d.settings.DirMode)
+			}, "upload", r.URL.Path, "", d.user)
 			return errToStatus(err), err
 		}
 
@@ -165,6 +174,10 @@ func resourcePostHandler(fileCache FileCache) handleFunc {
 				return writeErr
 			}
 
+			if scanErr := scanUploadedFile(r.Context(), d.user.Fs, r.URL.Path, d.settings.ClamAV); scanErr != nil {
+				return scanErr
+			}
+
 			etag := fmt.Sprintf(`"%x%x"`, info.ModTime().UnixNano(), info.Size())
 			w.Header().Set("ETag", etag)
 			return nil
@@ -174,7 +187,7 @@ func resourcePostHandler(fileCache FileCache) handleFunc {
 			_ = d.user.Fs.RemoveAll(r.URL.Path)
 		}
 
-		return errToStatus(err), err
+		return clamAVHTTPStatus(err), err
 	})
 }
 
@@ -216,8 +229,8 @@ func resourcePatchHandler(fileCache FileCache) handleFunc {
 		dst := r.URL.Query().Get("destination")
 		action := r.URL.Query().Get("action")
 		dst, err := url.QueryUnescape(dst)
-		dst = path.Clean("/" + dst)
-		src = path.Clean("/" + src)
+		dst = slashClean(dst)
+		src = slashClean(src)
 		if !d.Check(src) || !d.Check(dst) {
 			return http.StatusForbidden, nil
 		}
@@ -254,11 +267,51 @@ func resourcePatchHandler(fileCache FileCache) handleFunc {
 			}
 		}
 
+		if err = checkDescendants(d, src, dst); err != nil {
+			return errToStatus(err), err
+		}
+
 		err = d.RunHook(func() error {
 			return patchAction(r.Context(), action, src, dst, d, fileCache)
 		}, action, src, dst, d.user)
 
 		return errToStatus(err), err
+	})
+}
+
+// checkDescendants reports an error if the rules deny any path inside the src
+// tree or, when dst is not empty, the location that tree would land on. The
+// handlers only authorize the root of the operation, but copy, rename and
+// delete then recurse through the whole subtree, so a rule denying a descendant
+// of an allowed directory would be bypassed by operating on the parent instead.
+func checkDescendants(d *data, src, dst string) error {
+	if len(d.settings.Rules) == 0 && len(d.user.Rules) == 0 {
+		return nil
+	}
+
+	return afero.Walk(d.user.Fs, src, func(fPath string, _ os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !d.CheckRules(fPath) {
+			return fberrors.ErrPermissionDenied
+		}
+
+		if dst == "" {
+			return nil
+		}
+
+		rel, err := filepath.Rel(src, fPath)
+		if err != nil {
+			return err
+		}
+
+		if !d.CheckRules(filepath.Join(dst, rel)) {
+			return fberrors.ErrPermissionDenied
+		}
+
+		return nil
 	})
 }
 
@@ -407,6 +460,13 @@ var resourceGetRecursiveHandler = withUser(func(w http.ResponseWriter, r *http.R
 	entries := make([]RecursiveEntry, 0)
 
 	err = afero.Walk(d.user.Fs, rootPath, func(fPath string, info os.FileInfo, err error) error {
+		// Walking a large tree is expensive, and every entry is stat'ed through
+		// the scoped filesystem. Stop as soon as nobody is waiting for the
+		// answer instead of finishing the walk for a client that has gone.
+		if ctxErr := r.Context().Err(); ctxErr != nil {
+			return ctxErr
+		}
+
 		if err != nil {
 			return nil // skip entries we cannot read
 		}
@@ -425,7 +485,10 @@ var resourceGetRecursiveHandler = withUser(func(w http.ResponseWriter, r *http.R
 		}
 
 		entries = append(entries, RecursiveEntry{
-			Path:    fPath,
+			// afero.Walk joins paths with the OS separator, so on Windows fPath
+			// uses backslashes. The web API contract is forward slashes, so
+			// normalize it here (mirrors search/search.go).
+			Path:    filepath.ToSlash(fPath),
 			Name:    info.Name(),
 			Size:    info.Size(),
 			ModTime: info.ModTime(),
@@ -434,6 +497,12 @@ var resourceGetRecursiveHandler = withUser(func(w http.ResponseWriter, r *http.R
 		return nil
 	})
 	if err != nil {
+		// Once the request is done there is nobody left to answer, whatever the
+		// walk reported. Asking for a status here only produces a second header
+		// write on a connection that is already gone.
+		if r.Context().Err() != nil {
+			return 0, err
+		}
 		return http.StatusInternalServerError, err
 	}
 

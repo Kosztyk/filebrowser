@@ -9,6 +9,9 @@ interface ResourceBase {
   isSymlink: boolean;
   type: ResourceType;
   url: string;
+  archive?: boolean;
+  archivePath?: string;
+  archiveInnerPath?: string;
 }
 
 interface Resource extends ResourceBase {
@@ -31,6 +34,7 @@ interface ResourceItem extends ResourceBase {
 
 type ResourceType =
   | "dir"
+  | "archive"
   | "video"
   | "audio"
   | "image"
@@ -53,12 +57,13 @@ interface ClipItem {
   from: string;
   name: string;
   size?: number;
+  isDir?: boolean;
   modified?: string;
 }
 
 interface BreadCrumb {
   name: string;
-  url: string;
+  url: string | Record<string, any>;
 }
 
 interface ConflictingItem {
@@ -71,7 +76,7 @@ interface ConflictingResource {
   name: string;
   origin: ConflictingItem;
   dest: ConflictingItem;
-  checked: Array<"origin" | "dest", "origin-resume">;
+  checked: Array<"origin" | "dest" | "origin-resume">;
   isSmallerOnServer?: boolean;
 }
 
@@ -86,4 +91,26 @@ interface RecursiveEntry {
   size: number;
   modified: string;
   isDir: boolean;
+}
+
+
+interface ClamAVPathScanResponse {
+  jobId?: string;
+  status: "running" | "clean" | "infected" | "error";
+  message: string;
+  path: string;
+  scanned: number;
+  infected: boolean;
+  threat?: string;
+  done: boolean;
+}
+
+interface ArchiveCreateResponse {
+  jobId?: string;
+  status?: "running" | "done" | "error";
+  message?: string;
+  destination: string;
+  archived: number;
+  format: string;
+  done?: boolean;
 }

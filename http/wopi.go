@@ -35,6 +35,7 @@ type wopiCheckFileInfo struct {
 	UserID               string `json:"UserId"`
 	UserFriendlyName     string `json:"UserFriendlyName"`
 	UserCanWrite         bool   `json:"UserCanWrite"`
+	IsAdminUser          bool   `json:"IsAdminUser"`
 	ReadOnly             bool   `json:"ReadOnly"`
 	SupportsLocks        bool   `json:"SupportsLocks"`
 	SupportsGetLock      bool   `json:"SupportsGetLock"`
@@ -128,7 +129,7 @@ func loadWOPIFile(r *http.Request, d *data) (*wopiFileContext, int, error) {
 		return nil, http.StatusUnauthorized, errors.New("WOPI token does not match requested file")
 	}
 
-	user, err := d.store.Users.Get(d.server.Root, claims.UserID)
+	user, err := d.store.Users.Get(d.server.Root, d.server.FollowExternalSymlinks, claims.UserID)
 	if err != nil {
 		return nil, errToStatus(err), err
 	}
@@ -164,6 +165,7 @@ func wopiCheckFileInfoHandler(w http.ResponseWriter, r *http.Request, d *data, c
 		UserID:               strconv.FormatUint(uint64(ctx.Claims.UserID), 10),
 		UserFriendlyName:     d.user.Username,
 		UserCanWrite:         canWrite,
+		IsAdminUser:          d.user.Perm.Admin,
 		ReadOnly:             !canWrite,
 		SupportsLocks:        canWrite,
 		SupportsGetLock:      true,

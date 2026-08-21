@@ -1,11 +1,12 @@
 .context-menu {
-  position: absolute;
+  position: fixed;
   background: var(--surfacePrimary);
-  min-width: 180px;
-  max-width: 220px;
+  box-sizing: border-box;
+  min-width: min(180px, calc(100vw - 16px));
+  max-width: min(280px, calc(100vw - 16px));
   border: 1px solid var(--borderSecondary);
   box-shadow: 0 2px 4px var(--borderPrimary);
-  z-index: 999;
+  z-index: 10000;
 }
 
 .context-menu .action {

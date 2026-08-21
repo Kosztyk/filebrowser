@@ -7,16 +7,47 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-
 	fberrors "github.com/filebrowser/filebrowser/v2/errors"
 	"github.com/filebrowser/filebrowser/v2/share"
+	"github.com/filebrowser/filebrowser/v2/users"
+	"golang.org/x/crypto/bcrypt"
 )
+
+// shareResponse is the client-facing representation of a share. It deliberately
+// omits the server-side secrets of share.Link — the bcrypt PasswordHash (which
+// would be crackable offline) and the bypass Token — exposing only whether the
+// share is password-protected via HasPassword.
+type shareResponse struct {
+	Hash        string `json:"hash"`
+	Path        string `json:"path"`
+	UserID      uint   `json:"userID"`
+	Expire      int64  `json:"expire"`
+	HasPassword bool   `json:"hasPassword"`
+}
+
+func toShareResponse(l *share.Link) *shareResponse {
+	return &shareResponse{
+		Hash:        l.Hash,
+		Path:        l.Path,
+		UserID:      l.UserID,
+		Expire:      l.Expire,
+		HasPassword: l.PasswordHash != "",
+	}
+}
+
+func toShareResponses(links []*share.Link) []*shareResponse {
+	res := make([]*shareResponse, 0, len(links))
+	for _, l := range links {
+		res = append(res, toShareResponse(l))
+	}
+	return res
+}
 
 func withPermShare(fn handleFunc) handleFunc {
 	return withUser(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
@@ -39,7 +70,7 @@ var shareListHandler = withPermShare(func(w http.ResponseWriter, r *http.Request
 		s, err = d.store.Share.FindByUserID(d.user.ID)
 	}
 	if errors.Is(err, fberrors.ErrNotExist) {
-		return renderJSON(w, r, []*share.Link{})
+		return renderJSON(w, r, []*shareResponse{})
 	}
 
 	if err != nil {
@@ -53,7 +84,7 @@ var shareListHandler = withPermShare(func(w http.ResponseWriter, r *http.Request
 		return s[i].Expire < s[j].Expire
 	})
 
-	return renderJSON(w, r, s)
+	return renderJSON(w, r, toShareResponses(s))
 })
 
 var shareGetsHandler = withPermShare(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
@@ -62,20 +93,46 @@ var shareGetsHandler = withPermShare(func(w http.ResponseWriter, r *http.Request
 		err error
 	)
 	if d.user.Perm.Admin {
-		s, err = d.store.Share.GetsByPath(r.URL.Path)
+		s, err = getSharesForAdminPath(d, r.URL.Path)
 	} else {
 		s, err = d.store.Share.Gets(r.URL.Path, d.user.ID)
 	}
 	if errors.Is(err, fberrors.ErrNotExist) {
-		return renderJSON(w, r, []*share.Link{})
+		return renderJSON(w, r, []*shareResponse{})
 	}
 
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
 
-	return renderJSON(w, r, s)
+	return renderJSON(w, r, toShareResponses(s))
 })
+
+func getSharesForAdminPath(d *data, path string) ([]*share.Link, error) {
+	links, err := d.store.Share.All()
+	if err != nil {
+		return nil, err
+	}
+
+	adminPath := filepath.Clean(d.user.FullPath(path))
+	owners := make(map[uint]*users.User)
+	filtered := make([]*share.Link, 0, len(links))
+	for _, link := range links {
+		owner, ok := owners[link.UserID]
+		if !ok {
+			owner, err = d.store.Users.Get(d.server.Root, d.server.FollowExternalSymlinks, link.UserID)
+			if err != nil && !errors.Is(err, fberrors.ErrNotExist) {
+				return nil, err
+			}
+			owners[link.UserID] = owner // owner is nil on ErrNotExist
+		}
+		if owner != nil && filepath.Clean(owner.FullPath(link.Path)) == adminPath {
+			filtered = append(filtered, link)
+		}
+	}
+
+	return filtered, nil
+}
 
 var shareDeleteHandler = withPermShare(func(_ http.ResponseWriter, r *http.Request, d *data) (int, error) {
 	hash := strings.TrimSuffix(r.URL.Path, "/")
@@ -99,6 +156,17 @@ var shareDeleteHandler = withPermShare(func(_ http.ResponseWriter, r *http.Reque
 })
 
 var sharePostHandler = withPermShare(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
+	// Only allow sharing paths that currently exist. Otherwise a share could be
+	// created for a non-existent path and would silently start exposing
+	// whatever file later appears there.
+	//
+	// d.user.Fs is scoped, so Stat also refuses to follow a symlink whose target
+	// escapes the user's scope: that returns a permission error here and so
+	// blocks creating a share that points out of scope.
+	if _, err := d.user.Fs.Stat(r.URL.Path); err != nil {
+		return errToStatus(err), err
+	}
+
 	var s *share.Link
 	var body share.CreateBody
 	if r.Body != nil {
@@ -106,6 +174,17 @@ var sharePostHandler = withPermShare(func(w http.ResponseWriter, r *http.Request
 			return http.StatusBadRequest, fmt.Errorf("failed to decode body: %w", err)
 		}
 		defer r.Body.Close()
+	}
+
+	if d.settings.Erugo.Enabled {
+		externalShare, err := createErugoShare(r.Context(), d, r.URL.Path, body)
+		if err != nil {
+			if status := erugoUpstreamStatus(err); status != 0 {
+				return status, err
+			}
+			return errToStatus(err), err
+		}
+		return renderJSON(w, r, externalShare)
 	}
 
 	bytes := make([]byte, 6)
@@ -163,10 +242,10 @@ var sharePostHandler = withPermShare(func(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := d.store.Share.Save(s); err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, fmt.Errorf("failed to save native File Browser share for %q: %w", r.URL.Path, err)
 	}
 
-	return renderJSON(w, r, s)
+	return renderJSON(w, r, toShareResponse(s))
 })
 
 func getSharePasswordHash(body share.CreateBody) (data []byte, statuscode int, err error) {

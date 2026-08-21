@@ -68,7 +68,7 @@ func (a *HookAuth) Auth(r *http.Request, usr users.Store, stg *settings.Settings
 	case "block":
 		return nil, os.ErrPermission
 	case "pass":
-		u, err := a.Users.Get(a.Server.Root, a.Cred.Username)
+		u, err := a.Users.Get(a.Server.Root, a.Server.FollowExternalSymlinks, a.Cred.Username)
 		if err != nil || !users.CheckPwd(a.Cred.Password, u.Password) {
 			return nil, os.ErrPermission
 		}
@@ -86,22 +86,6 @@ func (a *HookAuth) LoginPage() bool {
 // RunCommand starts the hook command and returns the action
 func (a *HookAuth) RunCommand() (string, error) {
 	command := strings.Split(a.Command, " ")
-	envMapping := func(key string) string {
-		switch key {
-		case "USERNAME":
-			return a.Cred.Username
-		case "PASSWORD":
-			return a.Cred.Password
-		default:
-			return os.Getenv(key)
-		}
-	}
-	for i, arg := range command {
-		if i == 0 {
-			continue
-		}
-		command[i] = os.Expand(arg, envMapping)
-	}
 
 	cmd := exec.Command(command[0], command[1:]...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("USERNAME=%s", a.Cred.Username))
@@ -145,7 +129,7 @@ func (a *HookAuth) GetValues(s string) {
 
 // SaveUser updates the existing user or creates a new one when not found
 func (a *HookAuth) SaveUser() (*users.User, error) {
-	u, err := a.Users.Get(a.Server.Root, a.Cred.Username)
+	u, err := a.Users.Get(a.Server.Root, a.Server.FollowExternalSymlinks, a.Cred.Username)
 	if err != nil && !errors.Is(err, fberrors.ErrNotExist) {
 		return nil, err
 	}
@@ -173,15 +157,16 @@ func (a *HookAuth) SaveUser() (*users.User, error) {
 		}
 		u = a.GetUser(d)
 
-		userHome, err := a.Settings.MakeUserDir(u.Username, u.Scope, a.Server.Root)
+		// A scope explicitly returned by the hook takes precedence over the
+		// automatic per-user home directory derivation.
+		_, explicitScope := a.Fields.Values["user.scope"]
+		derivedScope, err := a.Settings.CreateUserHome(u, a.Server.Root, explicitScope)
 		if err != nil {
-			return nil, fmt.Errorf("user: failed to mkdir user home dir: [%s]", userHome)
+			return nil, err
 		}
-		u.Scope = userHome
-		log.Printf("user: %s, home dir: [%s].", u.Username, userHome)
+		log.Printf("user: %s, home dir: [%s].", u.Username, u.Scope)
 
-		err = a.Users.Save(u)
-		if err != nil {
+		if err := a.Users.SaveProvisioned(u, derivedScope); err != nil {
 			return nil, err
 		}
 	} else if p := !users.CheckPwd(a.Cred.Password, u.Password); len(a.Fields.Values) > 1 || p {

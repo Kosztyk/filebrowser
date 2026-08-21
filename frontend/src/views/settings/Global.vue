@@ -70,7 +70,7 @@
             <a
               class="link"
               target="_blank"
-              href="https://filebrowser.org/customization.html#custom-branding"
+              href="https://github.com/filebrowser/filebrowser/blob/master/docs/customization.md#custom-branding"
               >{{ t("settings.documentation") }}</a
             >
           </i18n-t>
@@ -172,7 +172,7 @@
             <input
               class="input input--block"
               type="url"
-              placeholder="https://collabora.koszhome.ro"
+              placeholder="https://collabora.example.com"
               v-model.trim="settings.collabora.url"
               id="collabora-url"
             />
@@ -185,11 +185,13 @@
             <input
               class="input input--block"
               type="url"
-              placeholder="https://filebrowser.koszhome.ro"
+              placeholder="https://files.example.com"
               v-model.trim="settings.collabora.publicURL"
               id="collabora-public-url"
             />
-            <span class="small">{{ t("settings.collaboraPublicURLHelp") }}</span>
+            <span class="small">{{
+              t("settings.collaboraPublicURLHelp")
+            }}</span>
           </p>
 
           <p>
@@ -199,11 +201,13 @@
             <input
               class="input input--block"
               type="url"
-              placeholder="http://192.168.68.204:8080"
+              placeholder="http://filebrowser.lan:8080"
               v-model.trim="settings.collabora.internalURL"
               id="collabora-internal-url"
             />
-            <span class="small">{{ t("settings.collaboraInternalURLHelp") }}</span>
+            <span class="small">{{
+              t("settings.collaboraInternalURLHelp")
+            }}</span>
           </p>
 
           <p>
@@ -271,6 +275,250 @@
               </li>
             </ul>
           </div>
+
+          <h3>{{ t("settings.convertx") }}</h3>
+
+          <p class="small">{{ t("settings.convertxHelp") }}</p>
+
+          <p>
+            <input
+              type="checkbox"
+              v-model="settings.convertx.enabled"
+              id="convertx-enabled"
+            />
+            {{ t("settings.convertxEnabled") }}
+          </p>
+
+          <p>
+            <label for="convertx-url">{{ t("settings.convertxURL") }}</label>
+            <input
+              class="input input--block"
+              type="url"
+              placeholder="http://convertx.lan:3000"
+              v-model.trim="settings.convertx.url"
+              id="convertx-url"
+            />
+          </p>
+
+          <p>
+            <label for="convertx-api-key">{{
+              t("settings.convertxAPIKey")
+            }}</label>
+            <input
+              class="input input--block"
+              type="password"
+              autocomplete="off"
+              placeholder="long random secret"
+              v-model.trim="settings.convertx.apiKey"
+              id="convertx-api-key"
+            />
+            <span class="small">{{ t("settings.convertxAPIKeyHelp") }}</span>
+          </p>
+
+          <p>
+            <label for="convertx-timeout">{{
+              t("settings.convertxTimeout")
+            }}</label>
+            <input
+              class="input input--block"
+              type="text"
+              placeholder="2m"
+              v-model.trim="settings.convertx.timeout"
+              id="convertx-timeout"
+            />
+          </p>
+
+          <p>
+            <button
+              class="button button--flat"
+              type="button"
+              @click.prevent="testConvertX"
+              :disabled="convertXTesting || !settings.convertx.url"
+            >
+              {{
+                convertXTesting
+                  ? t("settings.convertxTesting")
+                  : t("settings.convertxTestConnection")
+              }}
+            </button>
+          </p>
+
+          <h3>{{ t("settings.erugo") }}</h3>
+
+          <p class="small">{{ t("settings.erugoHelp") }}</p>
+
+          <p>
+            <input
+              type="checkbox"
+              v-model="settings.erugo.enabled"
+              id="erugo-enabled"
+            />
+            {{ t("settings.erugoEnabled") }}
+          </p>
+
+          <p>
+            <label for="erugo-url">{{ t("settings.erugoURL") }}</label>
+            <input
+              class="input input--block"
+              type="url"
+              placeholder="http://erugo.lan:9998"
+              v-model.trim="settings.erugo.url"
+              id="erugo-url"
+            />
+          </p>
+
+          <p>
+            <label for="erugo-api-key">{{ t("settings.erugoAPIKey") }}</label>
+            <input
+              class="input input--block"
+              type="password"
+              autocomplete="off"
+              placeholder="long random secret"
+              v-model.trim="settings.erugo.apiKey"
+              id="erugo-api-key"
+            />
+            <span class="small">{{ t("settings.erugoAPIKeyHelp") }}</span>
+          </p>
+
+          <p>
+            <label for="erugo-share-endpoint">{{
+              t("settings.erugoShareEndpoint")
+            }}</label>
+            <input
+              class="input input--block"
+              type="text"
+              placeholder="/api/integrations/convertx/share"
+              v-model.trim="settings.erugo.shareEndpoint"
+              id="erugo-share-endpoint"
+            />
+            <span class="small">{{
+              t("settings.erugoShareEndpointHelp")
+            }}</span>
+          </p>
+
+          <p>
+            <label for="erugo-reverse-share-endpoint">{{
+              t("settings.erugoReverseShareEndpoint")
+            }}</label>
+            <input
+              class="input input--block"
+              type="text"
+              placeholder="/api/integrations/filebrowser/reverse-share"
+              v-model.trim="settings.erugo.reverseShareEndpoint"
+              id="erugo-reverse-share-endpoint"
+            />
+            <span class="small">{{
+              t("settings.erugoReverseShareEndpointHelp")
+            }}</span>
+          </p>
+
+          <p>
+            <label for="erugo-default-expiry-hours">{{
+              t("settings.erugoDefaultExpiryHours")
+            }}</label>
+            <vue-number-input
+              controls
+              v-model.number="settings.erugo.defaultExpiryHours"
+              id="erugo-default-expiry-hours"
+              :min="1"
+            />
+          </p>
+
+          <p>
+            <label for="erugo-timeout">{{ t("settings.erugoTimeout") }}</label>
+            <input
+              class="input input--block"
+              type="text"
+              placeholder="2m"
+              v-model.trim="settings.erugo.timeout"
+              id="erugo-timeout"
+            />
+            <span class="small">{{ t("settings.erugoTimeoutHelp") }}</span>
+          </p>
+
+          <p>
+            <label for="erugo-upload-timeout">{{
+              t("settings.erugoUploadTimeout")
+            }}</label>
+            <input
+              class="input input--block"
+              type="text"
+              placeholder="2h"
+              v-model.trim="settings.erugo.uploadTimeout"
+              id="erugo-upload-timeout"
+            />
+            <span class="small">{{
+              t("settings.erugoUploadTimeoutHelp")
+            }}</span>
+          </p>
+
+          <p>
+            <button
+              class="button button--flat"
+              type="button"
+              @click.prevent="testErugo"
+              :disabled="erugoTesting || !settings.erugo.url"
+            >
+              {{
+                erugoTesting
+                  ? t("settings.erugoTesting")
+                  : t("settings.erugoTestConnection")
+              }}
+            </button>
+          </p>
+
+          <h3>{{ t("settings.clamavScanning") }}</h3>
+
+          <p class="small">{{ t("settings.clamavScanningHelp") }}</p>
+
+          <p>
+            <input
+              type="checkbox"
+              v-model="settings.clamav.enabled"
+              id="clamav-enabled"
+            />
+            {{ t("settings.clamavEnable") }}
+          </p>
+
+          <p>
+            <label for="clamav-url">{{ t("settings.clamavUrl") }}</label>
+            <input
+              class="input input--block"
+              type="text"
+              v-model.trim="settings.clamav.url"
+              id="clamav-url"
+              placeholder="http://clamav.lan:3000/api/v1/scan"
+            />
+          </p>
+
+          <p>
+            <label for="clamav-scan-depth">{{
+              t("settings.clamavScanDepth")
+            }}</label>
+            <vue-number-input
+              controls
+              v-model.number="settings.clamav.scanDepth"
+              id="clamav-scan-depth"
+              :min="0"
+            />
+          </p>
+
+          <p class="small">{{ t("settings.clamavScanDepthHelp") }}</p>
+
+          <p>
+            <button
+              class="button button--flat"
+              type="button"
+              @click.prevent="testClamAV"
+              :disabled="clamAVTesting || !settings.clamav.url"
+            >
+              {{
+                clamAVTesting
+                  ? t("settings.clamavTesting")
+                  : t("settings.clamavTestConnection")
+              }}
+            </button>
+          </p>
         </div>
 
         <div class="card-action">
@@ -327,7 +575,7 @@
             <a
               class="link"
               target="_blank"
-              href="https://filebrowser.org/command-execution.html#hook-runner"
+              href="https://github.com/filebrowser/filebrowser/blob/master/docs/command-execution.md#hook-runner"
               >{{ t("settings.documentation") }}</a
             >
           </i18n-t>
@@ -381,8 +629,12 @@ const error = ref<StatusError | null>(null);
 const originalSettings = ref<ISettings | null>(null);
 const settings = ref<ISettings | null>(null);
 const debounceTimeout = ref<number | null>(null);
+const pendingChunkSize = ref<string | null>(null);
 const collaboraTesting = ref(false);
 const collaboraTestResult = ref<CollaboraTestResponse | null>(null);
+const convertXTesting = ref(false);
+const erugoTesting = ref(false);
+const clamAVTesting = ref(false);
 
 const commandObject = ref<{
   [key: string]: string[] | string;
@@ -405,17 +657,33 @@ const formattedChunkSize = computed({
   set(value: string) {
     // Use debouncing to allow the user to type freely without
     // interruption by the formatter
-    // Clear the previous timeout if it exists
     if (debounceTimeout.value) {
       clearTimeout(debounceTimeout.value);
     }
 
+    pendingChunkSize.value = value;
+
     // Set a new timeout to apply the format after a short delay
     debounceTimeout.value = window.setTimeout(() => {
-      if (settings.value) settings.value.tus.chunkSize = parseBytes(value);
+      applyChunkSize();
     }, 1500);
   },
 });
+
+const applyChunkSize = () => {
+  if (debounceTimeout.value) {
+    clearTimeout(debounceTimeout.value);
+    debounceTimeout.value = null;
+  }
+
+  if (pendingChunkSize.value === null) return;
+
+  if (settings.value) {
+    settings.value.tus.chunkSize = parseBytes(pendingChunkSize.value);
+  }
+  pendingChunkSize.value = null;
+};
+
 
 // Define funcs
 const capitalize = (name: string, where: string | RegExp = "_") => {
@@ -440,6 +708,30 @@ const normalizedCollaboraSettings = (): SettingsCollabora => ({
   tokenTTL: settings.value?.collabora?.tokenTTL?.trim() || "2h",
 });
 
+const normalizedConvertXSettings = (): SettingsConvertX => ({
+  configured: true,
+  enabled: Boolean(settings.value?.convertx?.enabled),
+  url: settings.value?.convertx?.url?.trim().replace(/\/$/, "") ?? "",
+  apiKey: settings.value?.convertx?.apiKey?.trim() ?? "",
+  timeout: settings.value?.convertx?.timeout?.trim() || "2m",
+});
+
+const normalizedErugoSettings = (): SettingsErugo => ({
+  configured: true,
+  enabled: Boolean(settings.value?.erugo?.enabled),
+  url: settings.value?.erugo?.url?.trim().replace(/\/$/, "") ?? "",
+  apiKey: settings.value?.erugo?.apiKey?.trim() ?? "",
+  shareEndpoint:
+    settings.value?.erugo?.shareEndpoint?.trim() ||
+    "/api/integrations/convertx/share",
+  reverseShareEndpoint:
+    settings.value?.erugo?.reverseShareEndpoint?.trim() ||
+    "/api/integrations/filebrowser/reverse-share",
+  defaultExpiryHours: Number(settings.value?.erugo?.defaultExpiryHours ?? 168),
+  timeout: settings.value?.erugo?.timeout?.trim() || "2m",
+  uploadTimeout: settings.value?.erugo?.uploadTimeout?.trim() || "2h",
+});
+
 const testCollabora = async () => {
   if (settings.value === null || collaboraTesting.value) return;
 
@@ -462,8 +754,57 @@ const testCollabora = async () => {
   }
 };
 
+const testConvertX = async () => {
+  if (settings.value === null) return false;
+
+  try {
+    convertXTesting.value = true;
+    const result = await api.testConvertX(normalizedConvertXSettings());
+    $showSuccess(result.message || t("settings.convertxConnectionSuccessful"));
+  } catch (e: any) {
+    $showError(e);
+  } finally {
+    convertXTesting.value = false;
+  }
+
+  return true;
+};
+
+const testErugo = async () => {
+  if (settings.value === null) return false;
+
+  try {
+    erugoTesting.value = true;
+    const result = await api.testErugo(normalizedErugoSettings());
+    $showSuccess(result.message || t("settings.erugoConnectionSuccessful"));
+  } catch (e: any) {
+    $showError(e);
+  } finally {
+    erugoTesting.value = false;
+  }
+
+  return true;
+};
+
+const testClamAV = async () => {
+  if (settings.value === null) return false;
+
+  try {
+    clamAVTesting.value = true;
+    const result = await api.testClamAV(settings.value.clamav);
+    $showSuccess(result.message || t("settings.clamavConnectionSuccessful"));
+  } catch (e: any) {
+    $showError(e);
+  } finally {
+    clamAVTesting.value = false;
+  }
+
+  return true;
+};
+
 const save = async () => {
   if (settings.value === null) return false;
+  applyChunkSize();
   const newSettings: ISettings = {
     ...settings.value,
     shell:
@@ -476,6 +817,13 @@ const save = async () => {
   };
 
   newSettings.collabora = normalizedCollaboraSettings();
+  newSettings.convertx = normalizedConvertXSettings();
+  newSettings.erugo = normalizedErugoSettings();
+  newSettings.clamav = {
+    enabled: Boolean(settings.value?.clamav?.enabled),
+    url: settings.value?.clamav?.url?.trim() ?? "",
+    scanDepth: Number(settings.value?.clamav?.scanDepth ?? 0),
+  };
 
   const keys = Object.keys(settings.value.commands) as Array<
     keyof SettingsCommand
@@ -517,8 +865,9 @@ const parseBytes = (input: string) => {
   const matches = input.match(regex);
   if (matches) {
     const size = parseFloat(matches[1].concat(matches[2] || ""));
-    let unit: keyof SettingsUnit =
-      matches[3].toUpperCase() as keyof SettingsUnit;
+    let unit: keyof SettingsUnit = (
+      matches[3] ?? "B"
+    ).toUpperCase() as keyof SettingsUnit;
     if (!unit.endsWith("B")) {
       unit += "B";
     }
@@ -562,6 +911,32 @@ onMounted(async () => {
         wopiSecret: original.collabora?.wopiSecret ?? "",
         tokenTTL: original.collabora?.tokenTTL || "2h",
       },
+      convertx: {
+        configured: original.convertx?.configured ?? true,
+        enabled: original.convertx?.enabled ?? false,
+        url: original.convertx?.url ?? "",
+        apiKey: original.convertx?.apiKey ?? "",
+        timeout: original.convertx?.timeout || "2m",
+      },
+      erugo: {
+        configured: original.erugo?.configured ?? true,
+        enabled: original.erugo?.enabled ?? false,
+        url: original.erugo?.url ?? "",
+        apiKey: original.erugo?.apiKey ?? "",
+        shareEndpoint:
+          original.erugo?.shareEndpoint || "/api/integrations/convertx/share",
+        reverseShareEndpoint:
+          original.erugo?.reverseShareEndpoint ||
+          "/api/integrations/filebrowser/reverse-share",
+        defaultExpiryHours: original.erugo?.defaultExpiryHours || 168,
+        timeout: original.erugo?.timeout || "2m",
+        uploadTimeout: original.erugo?.uploadTimeout || "2h",
+      },
+      clamav: {
+        enabled: original.clamav?.enabled ?? false,
+        url: original.clamav?.url ?? "",
+        scanDepth: original.clamav?.scanDepth ?? 0,
+      },
       commands: {},
     };
 
@@ -590,7 +965,6 @@ onBeforeUnmount(() => {
   }
 });
 </script>
-
 
 <style scoped>
 .collabora-test-results {

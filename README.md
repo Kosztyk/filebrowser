@@ -31,6 +31,58 @@ The 3.3.x line also adds:
 
 **Fresh installation (from this repository):** follow [Installation — Docker or Linux systemd](docs/INSTALL_3.3.1.md). The Docker build uses `Dockerfile.source`, not the release-image `Dockerfile` that expects an already-built executable. Run `docker compose build` or build the native frontend first, using the documented Node 26 / pnpm 12 / Go 1.27 toolchain.
 
+```bash
+docker run -d \
+  --name filebrowser \
+  --restart unless-stopped \
+  -p 8000:80 \
+  -v filebrowser_data:/srv \
+  -v filebrowser_db:/database \
+  -v filebrowser_config:/config \
+  kosztyk/filebrowser:3.3.1
+```
+
+### Default credentials
+
+**Default user:** `admin`
+
+**Find initial password:**
+
+```bash
+docker logs filebrowser 2>&1 | grep "initialized with randomly generated password"
+```
+
+The command returns:
+
+User 'admin' initialized with randomly generated password: XXXXXXXXXXXX
+
+### Reset password
+
+Stop File Browser before resetting its password:
+
+```bash
+docker stop filebrowser
+```
+
+Then run:
+
+```bash
+docker run --rm \
+  -v filebrowser_db:/database \
+  -v filebrowser_config:/config \
+  --entrypoint /bin/filebrowser \
+  kosztyk/filebrowser:3.3.1 \
+  --config=/config/settings.json users update admin \
+  --password 'YourNewSecurePassword123!'
+```
+
+Restart File Browser:
+
+```bash
+docker start filebrowser
+```
+
+
 **Upgrade:** follow [3.3.1 upgrade and rollback](docs/INSTALL_3.3.1.md#upgrade-an-existing-installation). Preserve your **database, upload journal, journal artifacts, configuration, environment, systemd unit and data mounts**. Do not replace a running binary before backups or migrate a production database using the test-machine-only installer.
 
 **Integrations:** see [Integration setup, API checks and troubleshooting](docs/INTEGRATIONS_3.3.1.md) and the [sanitized six-service Compose example](deploy/examples/compose.integrations.yaml). A matching [.env.example](deploy/examples/.env.example) contains placeholders, no real passwords, IP addresses or API tokens. The individual vendor containers are optional; File Browser works without them.

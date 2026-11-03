@@ -3,6 +3,7 @@ package fbhttp
 import (
 	"encoding/json"
 	"errors"
+	"github.com/filebrowser/filebrowser/v2/files"
 	"net/http"
 	"net/url"
 	"os"
@@ -75,6 +76,9 @@ func renderJSON(w http.ResponseWriter, _ *http.Request, data interface{}) (int, 
 }
 
 func errToStatus(err error) int {
+	if errors.Is(err, files.ErrWriteConflict) {
+		return http.StatusConflict
+	}
 	switch {
 	case err == nil:
 		return http.StatusOK

@@ -1,0 +1,15 @@
+$ vitest run
+
+ RUN  v5.0.5 /workspace/scratch/989234643726/full-upgrade/filebrowser/frontend
+
+(node:147) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  12 passed (12)
+      Tests  46 passed (46)
+   Start at  09:07:11
+   Duration  3.96s (environment 63%, import 18%, transform 15%, tests 3%, worker 1%)
+
+    Isolate  12 workers spawned · ~1.41s startup each (spawn + environment, per file)
+             at least ~1.01s faster with isolate: false — reuses workers across files instead of one per file
+

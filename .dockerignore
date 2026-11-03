@@ -1,4 +1,9 @@
 .venv
+.git
+**/test-results
+**/playwright-report
+**/__pycache__
+*.zip
 dist
 .idea
 frontend/node_modules

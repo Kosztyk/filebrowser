@@ -27,6 +27,7 @@ const titles = {
   GlobalSettings: "settings.globalSettings",
   Users: "settings.users",
   User: "settings.user",
+  System: "settings.system",
   Forbidden: "errors.forbidden",
   NotFound: "errors.notFound",
   InternalServerError: "errors.internal",
@@ -78,6 +79,11 @@ const routes = [
           path: "/settings/profile",
         },
         children: [
+          {
+            path: "system",
+            name: "System",
+            component: () => import("@/views/settings/System.vue"),
+          },
           {
             path: "profile",
             name: "ProfileSettings",

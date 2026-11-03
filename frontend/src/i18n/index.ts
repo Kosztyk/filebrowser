@@ -1,43 +1,46 @@
 import dayjs from "dayjs";
 import { createI18n } from "vue-i18n";
 
-import("dayjs/locale/ar");
-import("dayjs/locale/bg");
-import("dayjs/locale/ca");
-import("dayjs/locale/cs");
-import("dayjs/locale/de");
-import("dayjs/locale/el");
-import("dayjs/locale/en");
-import("dayjs/locale/es");
-import("dayjs/locale/fr");
-import("dayjs/locale/he");
-import("dayjs/locale/hr");
-import("dayjs/locale/hu");
-import("dayjs/locale/is");
-import("dayjs/locale/it");
-import("dayjs/locale/ja");
-import("dayjs/locale/ko");
-import("dayjs/locale/lv");
-import("dayjs/locale/nb");
-import("dayjs/locale/nl");
-import("dayjs/locale/nl-be");
-import("dayjs/locale/pl");
-import("dayjs/locale/pt-br");
-import("dayjs/locale/pt");
-import("dayjs/locale/ro");
-import("dayjs/locale/ru");
-import("dayjs/locale/sk");
-import("dayjs/locale/sv");
-import("dayjs/locale/tr");
-import("dayjs/locale/uk");
-import("dayjs/locale/vi");
-import("dayjs/locale/zh-cn");
-import("dayjs/locale/zh-tw");
-
-// All i18n resources specified in the plugin `include` option can be loaded
-// at once using the import syntax
-import messages from "@intlify/unplugin-vue-i18n/messages";
-
+import english from "./en.json";
+const messages = { en: english };
+const translations = import.meta.glob(["./*.json", "!./en.json"], {
+  import: "default",
+});
+const dayLocales = {
+  ar: () => import("dayjs/locale/ar"),
+  bg: () => import("dayjs/locale/bg"),
+  ca: () => import("dayjs/locale/ca"),
+  cs: () => import("dayjs/locale/cs"),
+  de: () => import("dayjs/locale/de"),
+  el: () => import("dayjs/locale/el"),
+  en: () => import("dayjs/locale/en"),
+  es: () => import("dayjs/locale/es"),
+  fr: () => import("dayjs/locale/fr"),
+  he: () => import("dayjs/locale/he"),
+  hr: () => import("dayjs/locale/hr"),
+  hu: () => import("dayjs/locale/hu"),
+  is: () => import("dayjs/locale/is"),
+  it: () => import("dayjs/locale/it"),
+  ja: () => import("dayjs/locale/ja"),
+  ko: () => import("dayjs/locale/ko"),
+  lv: () => import("dayjs/locale/lv"),
+  nb: () => import("dayjs/locale/nb"),
+  nl: () => import("dayjs/locale/nl"),
+  "nl-be": () => import("dayjs/locale/nl-be"),
+  pl: () => import("dayjs/locale/pl"),
+  "pt-br": () => import("dayjs/locale/pt-br"),
+  pt: () => import("dayjs/locale/pt"),
+  ro: () => import("dayjs/locale/ro"),
+  ru: () => import("dayjs/locale/ru"),
+  sk: () => import("dayjs/locale/sk"),
+  sv: () => import("dayjs/locale/sv"),
+  tr: () => import("dayjs/locale/tr"),
+  uk: () => import("dayjs/locale/uk"),
+  vi: () => import("dayjs/locale/vi"),
+  "zh-cn": () => import("dayjs/locale/zh-cn"),
+  "zh-tw": () => import("dayjs/locale/zh-tw"),
+} as Record<string, () => Promise<unknown>>;
+let localeRequest = 0;
 export function detectLocale() {
   // locale is an RFC 5646 language tag
   // https://developer.mozilla.org/en-US/docs/Web/API/Navigator/language
@@ -164,7 +167,7 @@ export function detectLocale() {
 export const rtlLanguages = ["he", "ar"];
 
 export const i18n = createI18n({
-  locale: detectLocale(),
+  locale: "en",
   fallbackLocale: "en",
   messages,
   // expose i18n.global for outside components
@@ -177,15 +180,26 @@ export const isRtl = (locale?: string) => {
   return rtlLanguages.includes(locale || i18n.global.locale.value);
 };
 
-export function setLocale(locale: string) {
-  dayjs.locale(locale);
-  // according to doc u only need .value if legacy: false but they lied
-  // https://vue-i18n.intlify.dev/guide/essentials/scope.html#local-scope-1
-  // @ts-expect-error incorrect type when legacy
+export async function setLocale(locale: string) {
+  const request = ++localeRequest;
+  const load = translations[`./${locale}.json`];
+  if (locale !== "en" && load) {
+    i18n.global.setLocaleMessage(locale, (await load()) as any);
+  } else if (locale !== "en") {
+    locale = "en";
+  }
+  const dayLocale = locale === "pt-pt" ? "pt" : locale === "no" ? "nb" : locale;
+  await dayLocales[dayLocale]?.();
+  if (request !== localeRequest) return;
+  dayjs.locale(dayLocale);
+  // @ts-expect-error legacy typings do not expose the composition locale ref
   i18n.global.locale.value = locale;
+  setHtmlLocale(locale);
 }
+void setLocale(detectLocale());
 
 export function setHtmlLocale(locale: string) {
+  if (typeof document === "undefined") return;
   const html = document.documentElement;
   html.lang = locale;
   if (isRtl(locale)) html.dir = "rtl";

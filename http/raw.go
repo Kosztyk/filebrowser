@@ -1,13 +1,11 @@
 package fbhttp
 
 import (
+	"context"
 	"errors"
-	"fmt"
-	"io/fs"
 	"log"
 	"net/http"
 	"net/url"
-	gopath "path"
 	"path/filepath"
 	"strings"
 
@@ -104,68 +102,7 @@ var rawHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *data) 
 })
 
 func getFiles(d *data, path, commonPath string) ([]archives.FileInfo, error) {
-	if !d.Check(path) {
-		return nil, nil
-	}
-
-	info, err := d.user.Fs.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var archiveFiles []archives.FileInfo
-
-	if path != commonPath {
-		nameInArchive := strings.TrimPrefix(path, commonPath)
-		nameInArchive = strings.TrimPrefix(nameInArchive, string(filepath.Separator))
-		nameInArchive = filepath.ToSlash(nameInArchive)
-		// A backslash is a legal filename character on POSIX hosts, so it can
-		// reach here verbatim. Rewriting it to the path separator "/" would
-		// manufacture a traversal sequence (e.g. "..\..\x" -> "../../x") that
-		// escapes the extraction directory on the victim's machine, while
-		// leaving it as "\" lets Windows extractors treat it as a separator.
-		// Neutralize it to an inert character instead of turning it into one.
-		nameInArchive = strings.ReplaceAll(nameInArchive, "\\", "_")
-
-		// Defense in depth: never emit an archive entry whose path escapes the
-		// archive root, regardless of how the name was produced.
-		if cleaned := gopath.Clean("/" + nameInArchive); cleaned != "/"+nameInArchive {
-			return nil, fmt.Errorf("refusing unsafe archive entry name: %q", nameInArchive)
-		}
-
-		archiveFiles = append(archiveFiles, archives.FileInfo{
-			FileInfo:      info,
-			NameInArchive: nameInArchive,
-			Open: func() (fs.File, error) {
-				return d.user.Fs.Open(path)
-			},
-		})
-	}
-
-	if info.IsDir() {
-		f, err := d.user.Fs.Open(path)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-
-		names, err := f.Readdirnames(0)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, name := range names {
-			fPath := filepath.Join(path, name)
-			subFiles, err := getFiles(d, fPath, commonPath)
-			if err != nil {
-				log.Printf("Failed to get files from %s: %v", fPath, err)
-				continue
-			}
-			archiveFiles = append(archiveFiles, subFiles...)
-		}
-	}
-
-	return archiveFiles, nil
+	return collectArchiveFiles(context.Background(), d, []string{path}, commonPath)
 }
 
 func rawDirHandler(w http.ResponseWriter, r *http.Request, d *data, file *files.FileInfo) (int, error) {

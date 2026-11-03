@@ -1,0 +1,66 @@
+packages:
+  - .
+
+# Keep compiler-API consumers on Microsoft's supported TS 6 compatibility
+# package while @typescript/native supplies the TypeScript 7 compiler.
+strictPeerDependencies: true
+
+# esbuild verifies its platform executable. The other hooks only print funding
+# messages or enforce the author's development package manager.
+allowBuilds:
+  esbuild: true
+  core-js: false
+  es5-ext: false
+  vue-reader: false
+
+overrides:
+  '@xmldom/xmldom': 0.9.12
+  rollup: 4.67.4
+  esbuild: 0.28.2
+  minimatch: 11.0.3
+
+# The extension uses the public renderToString API, which is unchanged in
+# KaTeX 0.19. Regression coverage lives in markdown-math.test.ts.
+peerDependencyRules:
+  allowedVersions:
+    'marked-katex-extension@5.1.13>katex': '0.19.1'
+
+# v10 has a fixed rate list. Retain this app's existing 2.5x/3x choices until
+# upstream exposes its planned playbackRates configuration.
+patchedDependencies:
+  '@videojs/core@10.2.0': patches/videojs-core-playback-rates.patch
+
+minimumReleaseAgeExclude:
+  - '@intlify/core-base@11.4.17'
+  - '@intlify/devtools-types@11.4.17'
+  - '@intlify/message-compiler@11.4.17'
+  - '@intlify/shared@11.4.17'
+  - '@rollup/rollup-android-arm-eabi@4.67.4'
+  - '@rollup/rollup-android-arm64@4.67.4'
+  - '@rollup/rollup-android-x64@4.67.4'
+  - '@rollup/rollup-darwin-arm64@4.67.4'
+  - '@rollup/rollup-darwin-x64@4.67.4'
+  - '@rollup/rollup-freebsd-arm64@4.67.4'
+  - '@rollup/rollup-freebsd-x64@4.67.4'
+  - '@rollup/rollup-linux-arm-gnueabihf@4.67.4'
+  - '@rollup/rollup-linux-arm-musleabihf@4.67.4'
+  - '@rollup/rollup-linux-arm64-gnu@4.67.4'
+  - '@rollup/rollup-linux-arm64-musl@4.67.4'
+  - '@rollup/rollup-linux-loong64-gnu@4.67.4'
+  - '@rollup/rollup-linux-loong64-musl@4.67.4'
+  - '@rollup/rollup-linux-ppc64-gnu@4.67.4'
+  - '@rollup/rollup-linux-ppc64-musl@4.67.4'
+  - '@rollup/rollup-linux-riscv64-gnu@4.67.4'
+  - '@rollup/rollup-linux-riscv64-musl@4.67.4'
+  - '@rollup/rollup-linux-s390x-gnu@4.67.4'
+  - '@rollup/rollup-linux-x64-gnu@4.67.4'
+  - '@rollup/rollup-linux-x64-musl@4.67.4'
+  - '@rollup/rollup-openbsd-x64@4.67.4'
+  - '@rollup/rollup-openharmony-arm64@4.67.4'
+  - '@rollup/rollup-win32-arm64-msvc@4.67.4'
+  - '@rollup/rollup-win32-ia32-msvc@4.67.4'
+  - '@rollup/rollup-win32-x64-gnu@4.67.4'
+  - '@rollup/rollup-win32-x64-msvc@4.67.4'
+  - js-base64@3.9.6
+  - rollup@4.67.4
+  - vue-i18n@11.4.17

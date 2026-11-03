@@ -122,10 +122,10 @@ func normalizeErugoURL(raw string) (string, error) {
 
 	parsed, err := url.Parse(cleaned)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return "", errors.New("Erugo URL must be a valid absolute URL, for example http://erugo.lan:9998")
+		return "", errors.New("erugo URL must be a valid absolute URL, for example http://erugo.lan:9998")
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return "", errors.New("Erugo URL must use http or https")
+		return "", errors.New("erugo URL must use http or https")
 	}
 
 	return cleaned, nil
@@ -207,7 +207,7 @@ func testErugoConnection(ctx context.Context, cfg settings.Erugo) error {
 	_, _ = io.Copy(io.Discard, io.LimitReader(healthRes.Body, 2048))
 	healthRes.Body.Close()
 	if healthRes.StatusCode < 200 || healthRes.StatusCode >= 400 {
-		return fmt.Errorf("Erugo health check returned HTTP %d", healthRes.StatusCode)
+		return fmt.Errorf("erugo health check returned HTTP %d", healthRes.StatusCode)
 	}
 
 	// Validate that the integration endpoint exists and that the token is accepted.
@@ -235,12 +235,12 @@ func testErugoConnection(ctx context.Context, cfg settings.Erugo) error {
 	case http.StatusBadRequest, http.StatusUnprocessableEntity:
 		// Expected for an authenticated probe without a file.
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return fmt.Errorf("Erugo rejected the API token with HTTP %d", probeRes.StatusCode)
+		return fmt.Errorf("erugo rejected the API token with HTTP %d", probeRes.StatusCode)
 	case http.StatusNotFound:
-		return fmt.Errorf("Erugo integration endpoint was not found at %s", erugoShareEndpoint(cfg))
+		return fmt.Errorf("erugo integration endpoint was not found at %s", erugoShareEndpoint(cfg))
 	default:
 		if probeRes.StatusCode < 200 || probeRes.StatusCode >= 300 {
-			return fmt.Errorf("Erugo integration endpoint returned HTTP %d: %s", probeRes.StatusCode, strings.TrimSpace(string(responseBody)))
+			return fmt.Errorf("erugo integration endpoint returned HTTP %d: %s", probeRes.StatusCode, strings.TrimSpace(string(responseBody)))
 		}
 	}
 
@@ -262,14 +262,14 @@ func testErugoConnection(ctx context.Context, cfg settings.Erugo) error {
 	case http.StatusBadRequest, http.StatusUnprocessableEntity:
 		return nil
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return fmt.Errorf("Erugo rejected the API token for reverse shares with HTTP %d", reverseRes.StatusCode)
+		return fmt.Errorf("erugo rejected the API token for reverse shares with HTTP %d", reverseRes.StatusCode)
 	case http.StatusNotFound:
-		return fmt.Errorf("Erugo reverse-share integration endpoint was not found at %s", erugoReverseShareEndpoint(cfg))
+		return fmt.Errorf("erugo reverse-share integration endpoint was not found at %s", erugoReverseShareEndpoint(cfg))
 	}
 	if reverseRes.StatusCode >= 200 && reverseRes.StatusCode < 300 {
 		return nil
 	}
-	return fmt.Errorf("Erugo reverse-share endpoint returned HTTP %d: %s", reverseRes.StatusCode, strings.TrimSpace(string(reverseBody)))
+	return fmt.Errorf("erugo reverse-share endpoint returned HTTP %d: %s", reverseRes.StatusCode, strings.TrimSpace(string(reverseBody)))
 }
 
 var erugoShareConfigHandler = withPermShare(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
@@ -296,12 +296,12 @@ var settingsErugoTestHandler = withAdmin(func(w http.ResponseWriter, r *http.Req
 	if err := testErugoConnection(r.Context(), cfg); err != nil {
 		return http.StatusBadGateway, err
 	}
-	return renderJSON(w, r, erugoTestResponse{Status: "OK", Message: "Erugo connection successful"})
+	return renderJSON(w, r, erugoTestResponse{Status: "OK", Message: "erugo connection successful"})
 })
 
 var erugoReverseShareHandler = withPermShare(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
 	if !d.settings.Erugo.Enabled {
-		return http.StatusBadRequest, errors.New("Erugo integration is disabled")
+		return http.StatusBadRequest, errors.New("erugo integration is disabled")
 	}
 
 	var body erugoReverseShareRequest
@@ -371,7 +371,7 @@ func createErugoReverseShare(ctx context.Context, cfg settings.Erugo, body erugo
 
 	res, err := (&http.Client{}).Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("Erugo reverse-share request failed: %w", err)
+		return nil, fmt.Errorf("erugo reverse-share request failed: %w", err)
 	}
 	defer res.Body.Close()
 	responseBody, _ := io.ReadAll(io.LimitReader(res.Body, 64*1024))
@@ -382,16 +382,16 @@ func createErugoReverseShare(ctx context.Context, cfg settings.Erugo, body erugo
 		}
 		return nil, &erugoUpstreamError{
 			status:  status,
-			message: fmt.Sprintf("Erugo reverse-share creation failed with HTTP %d: %s", res.StatusCode, erugoErrorMessage(responseBody)),
+			message: fmt.Sprintf("erugo reverse-share creation failed with HTTP %d: %s", res.StatusCode, erugoErrorMessage(responseBody)),
 		}
 	}
 
 	var erugoResponse erugoReverseShareResponse
 	if err := json.Unmarshal(responseBody, &erugoResponse); err != nil {
-		return nil, fmt.Errorf("Erugo returned invalid reverse-share JSON: %w", err)
+		return nil, fmt.Errorf("erugo returned invalid reverse-share JSON: %w", err)
 	}
 	if erugoResponse.Data.Invite.ID <= 0 {
-		return nil, errors.New("Erugo did not return a reverse-share invitation ID")
+		return nil, errors.New("erugo did not return a reverse-share invitation ID")
 	}
 
 	return &erugoCreatedReverseShare{
@@ -447,10 +447,28 @@ func createErugoShare(ctx context.Context, d *data, requestedPath string, body s
 		requestBody   io.Reader
 		contentType   string
 		contentLength int64
-		cleanup       = func() {}
 	)
 
-	if info.IsDir() {
+	jobState, _ := ctx.Value(erugoContextKey{}).(*erugoJobContext)
+	switch {
+	case info.IsDir() && jobState != nil && jobState.prepared != "":
+		prefix, suffix, kind, e := buildErugoMultipartEnvelope(filename, body, cfg, shareName)
+		if e != nil {
+			return nil, e
+		}
+		fd, e := os.Open(jobState.prepared)
+		if e != nil {
+			return nil, e
+		}
+		defer fd.Close()
+		stat, e := fd.Stat()
+		if e != nil {
+			return nil, e
+		}
+		requestBody = io.MultiReader(bytes.NewReader(prefix), fd, bytes.NewReader(suffix))
+		contentType = kind
+		contentLength = int64(len(prefix)+len(suffix)) + stat.Size()
+	case info.IsDir():
 		// Folder size is not known until the ZIP is produced, so folders still use
 		// a temporary multipart file. Regular files use the zero-copy streaming
 		// path below and do not consume an additional file-sized amount of /tmp.
@@ -458,7 +476,7 @@ func createErugoShare(ctx context.Context, d *data, requestedPath string, body s
 		if err != nil {
 			return nil, err
 		}
-		cleanup = func() {
+		cleanup := func() {
 			_ = tmp.Close()
 			_ = os.Remove(tmp.Name())
 		}
@@ -503,7 +521,7 @@ func createErugoShare(ctx context.Context, d *data, requestedPath string, body s
 		}
 		requestBody = tmp
 		contentLength = stat.Size()
-	} else {
+	default:
 		// Build only the small multipart envelope in memory, then stream the
 		// original file directly between the prefix and suffix. The request still
 		// has an exact Content-Length, so PHP/Apache does not receive chunked
@@ -516,22 +534,31 @@ func createErugoShare(ctx context.Context, d *data, requestedPath string, body s
 		if err != nil {
 			return nil, err
 		}
-		cleanup = func() { _ = file.Close() }
+		cleanup := func() { _ = file.Close() }
 		defer cleanup()
 
 		requestBody = io.MultiReader(bytes.NewReader(prefix), file, bytes.NewReader(suffix))
 		contentType = multipartType
 		contentLength = int64(len(prefix)) + info.Size() + int64(len(suffix))
 		if contentLength < int64(len(prefix)+len(suffix)) {
-			return nil, errors.New("Erugo share failed: invalid source file size")
+			return nil, errors.New("erugo share failed: invalid source file size")
 		}
 	}
 
+	if jobState != nil {
+		if e := jobState.f.phase(jobState.j, "submitting"); e != nil {
+			return nil, e
+		}
+		requestBody = erugoProgressReader{requestCtx, requestBody, jobState, contentLength}
+	}
 	req, err := http.NewRequestWithContext(requestCtx, http.MethodPost, base+erugoShareEndpoint(cfg), requestBody)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", contentType)
+	if jobState != nil {
+		req.Header.Set("Idempotency-Key", jobState.j.ID)
+	}
 	req.ContentLength = contentLength
 	addErugoAuth(req, cfg.APIKey)
 
@@ -552,14 +579,14 @@ func createErugoShare(ctx context.Context, d *data, requestedPath string, body s
 	}
 
 	started := time.Now()
-	log.Printf("Erugo share upload started: path=%q filename=%q bytes=%d timeout=%s clamav_bypass_expected=%t", requestedPath, filename, contentLength, uploadTimeout, largeFile)
+	log.Printf("erugo share upload started: path=%q filename=%q bytes=%d timeout=%s clamav_bypass_expected=%t", requestedPath, filename, contentLength, uploadTimeout, largeFile)
 
 	// The request context is the upload deadline. Leaving Client.Timeout unset
 	// avoids a second, shorter timeout cutting off multi-gigabyte transfers.
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("Erugo share failed after %s: %w", time.Since(started).Round(time.Second), err)
+		return nil, fmt.Errorf("erugo share failed after %s: %w", time.Since(started).Round(time.Second), err)
 	}
 	defer res.Body.Close()
 	responseBody, _ := io.ReadAll(io.LimitReader(res.Body, 64*1024))
@@ -572,14 +599,14 @@ func createErugoShare(ctx context.Context, d *data, requestedPath string, body s
 			return nil, &erugoUpstreamError{
 				status: http.StatusRequestEntityTooLarge,
 				message: fmt.Sprintf(
-					"Erugo rejected the upload as too large after %s. Increase Caddy request_body max_size and PHP upload_max_filesize/post_max_size on Erugo (upstream response: %s)",
+					"erugo rejected the upload as too large after %s. Increase Caddy request_body max_size and PHP upload_max_filesize/post_max_size on Erugo (upstream response: %s)",
 					duration, message,
 				),
 			}
 		case http.StatusUnprocessableEntity, http.StatusBadRequest:
 			return nil, &erugoUpstreamError{
 				status:  res.StatusCode,
-				message: fmt.Sprintf("Erugo rejected the share with HTTP %d after %s: %s", res.StatusCode, duration, message),
+				message: fmt.Sprintf("erugo rejected the share with HTTP %d after %s: %s", res.StatusCode, duration, message),
 			}
 		default:
 			status := http.StatusBadGateway
@@ -588,21 +615,21 @@ func createErugoShare(ctx context.Context, d *data, requestedPath string, body s
 			}
 			return nil, &erugoUpstreamError{
 				status:  status,
-				message: fmt.Sprintf("Erugo share failed with HTTP %d after %s: %s", res.StatusCode, duration, message),
+				message: fmt.Sprintf("erugo share failed with HTTP %d after %s: %s", res.StatusCode, duration, message),
 			}
 		}
 	}
 
 	var erugoResponse erugoShareResponse
 	if err := json.Unmarshal(responseBody, &erugoResponse); err != nil {
-		return nil, fmt.Errorf("Erugo returned invalid JSON: %w", err)
+		return nil, fmt.Errorf("erugo returned invalid JSON: %w", err)
 	}
 	shareURL := extractErugoShareURL(erugoResponse)
 	if shareURL == "" {
-		return nil, errors.New("Erugo did not return a share URL")
+		return nil, errors.New("erugo did not return a share URL")
 	}
 
-	log.Printf("Erugo share upload completed: path=%q bytes=%d duration=%s", requestedPath, contentLength, time.Since(started).Round(time.Second))
+	log.Printf("erugo share upload completed: path=%q bytes=%d duration=%s", requestedPath, contentLength, time.Since(started).Round(time.Second))
 
 	return &erugoCreatedShare{
 		Hash:                   "erugo",

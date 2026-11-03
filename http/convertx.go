@@ -13,7 +13,6 @@ import (
 	gopath "path"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	fberrors "github.com/filebrowser/filebrowser/v2/errors"
@@ -91,18 +90,6 @@ type convertXJobResponse struct {
 	Message string            `json:"message,omitempty"`
 }
 
-type convertXConversionJobStore struct {
-	mu   sync.Mutex
-	jobs map[string]convertXConversionJobEntry
-}
-
-type convertXConversionJobEntry struct {
-	Response  convertXConvertResponse
-	UpdatedAt time.Time
-}
-
-var convertXConversionJobs = &convertXConversionJobStore{jobs: map[string]convertXConversionJobEntry{}}
-
 func normalizeConvertXURL(raw string) (string, error) {
 	cleaned := strings.TrimRight(strings.TrimSpace(raw), "/")
 	if cleaned == "" {
@@ -161,9 +148,16 @@ func probeConvertXURL(ctx context.Context, client *http.Client, targetURL string
 		return fmt.Errorf("failed to reach ConvertX: %w", err)
 	}
 	defer res.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 1024))
-
-	if res.StatusCode >= 200 && res.StatusCode < 400 {
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		if integrationAPI {
+			var health map[string]json.RawMessage
+			if e := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&health); e != nil || health == nil {
+				return fmt.Errorf("ConvertX health endpoint returned incompatible JSON; the File Browser integration API is required")
+			}
+			if v, ok := health["success"]; ok && string(v) == "false" {
+				return fmt.Errorf("ConvertX health endpoint reported failure")
+			}
+		}
 		return nil
 	}
 	if integrationAPI && res.StatusCode == http.StatusNotFound {
@@ -220,22 +214,15 @@ var convertXConvertHandler = withUser(func(w http.ResponseWriter, r *http.Reques
 		return renderJSON(w, r, response)
 	}
 
-	jobID := newFileActionJobID()
-	response := convertXConvertResponse{
-		JobID:       jobID,
-		Status:      "running",
-		Message:     fmt.Sprintf("Conversion started: %s → %s", plan.Source, plan.Destination),
-		Source:      plan.Source,
-		Destination: plan.Destination,
-		ConvertTo:   plan.ConvertTo,
-		Converter:   plan.Converter,
+	if d.features != nil {
+		j, e := d.features.submit(d, "convert", plan, []string{plan.Source, plan.Destination})
+		if e != nil {
+			return errToStatus(e), e
+		}
+		w.WriteHeader(http.StatusAccepted)
+		return renderJSON(w, r, convertXConvertResponse{JobID: j.ID, Status: "running", Source: plan.Source, Destination: plan.Destination, ConvertTo: plan.ConvertTo})
 	}
-	convertXConversionJobs.set(jobID, response)
-
-	go runConvertXConversionJob(jobID, d, plan)
-
-	w.WriteHeader(http.StatusAccepted)
-	return renderJSON(w, r, response)
+	return http.StatusServiceUnavailable, nil
 })
 
 var convertXConversionJobStatusHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
@@ -248,12 +235,10 @@ var convertXConversionJobStatusHandler = withUser(func(w http.ResponseWriter, r 
 		return http.StatusBadRequest, fberrors.ErrInvalidRequestParams
 	}
 
-	response, ok := convertXConversionJobs.get(jobID)
-	if !ok {
-		return http.StatusNotFound, os.ErrNotExist
+	if d.features != nil {
+		return legacyJobStatus(w, r, d, jobID, "convert")
 	}
-
-	return renderJSON(w, r, response)
+	return http.StatusServiceUnavailable, nil
 })
 
 func prepareConvertXConversionPlan(request convertXConvertRequest, d *data) (*convertXConvertPlan, int, error) {
@@ -336,11 +321,10 @@ func runConvertXConversionSync(ctx context.Context, d *data, plan *convertXConve
 		Converter:   plan.Converter,
 	}
 
-	err := d.RunHook(func() error {
+	err := runPublicationHook(d, "upload", plan.Destination, func() error {
 		return convertXConvertAndSave(ctx, d, plan)
-	}, "upload", plan.Destination, "", d.user)
+	})
 	if err != nil {
-		_ = d.user.Fs.Remove(plan.Destination)
 		return response, err
 	}
 
@@ -348,41 +332,6 @@ func runConvertXConversionSync(ctx context.Context, d *data, plan *convertXConve
 	response.Done = true
 	response.Message = fmt.Sprintf("Converted file saved to %s", plan.Destination)
 	return response, nil
-}
-
-func runConvertXConversionJob(jobID string, d *data, plan *convertXConvertPlan) {
-	response := convertXConvertResponse{
-		JobID:       jobID,
-		Status:      "running",
-		Source:      plan.Source,
-		Destination: plan.Destination,
-		ConvertTo:   plan.ConvertTo,
-		Converter:   plan.Converter,
-	}
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			_ = d.user.Fs.Remove(plan.Destination)
-			response.Status = "error"
-			response.Done = true
-			response.Message = fmt.Sprintf("Conversion failed for %s: %v", plan.Source, recovered)
-			convertXConversionJobs.set(jobID, response)
-		}
-	}()
-
-	ctx, cancel := context.WithTimeout(context.Background(), convertXTimeout(d.settings.ConvertX.Timeout))
-	defer cancel()
-
-	completed, err := runConvertXConversionSync(ctx, d, plan)
-	completed.JobID = jobID
-	if err != nil {
-		completed.Status = "error"
-		completed.Done = true
-		completed.Message = err.Error()
-		convertXConversionJobs.set(jobID, completed)
-		return
-	}
-
-	convertXConversionJobs.set(jobID, completed)
 }
 
 func convertXConvertAndSave(ctx context.Context, d *data, plan *convertXConvertPlan) error {
@@ -423,7 +372,7 @@ func fetchConvertXTargets(ctx context.Context, cfg settings.ConvertX, from strin
 	}
 
 	targetURL := base + "/api/conversions?from=" + url.QueryEscape(from)
-	client := &http.Client{Timeout: convertXTimeout(cfg.Timeout)}
+	client := convertClient(cfg, convertXTimeout(cfg.Timeout))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
 	if err != nil {
 		return nil, err
@@ -451,6 +400,7 @@ func submitConvertXConversion(ctx context.Context, cfg settings.ConvertX, fileNa
 	}
 
 	pr, pw := io.Pipe()
+	defer pr.Close()
 	writer := multipart.NewWriter(pw)
 
 	go func() {
@@ -485,10 +435,14 @@ func submitConvertXConversion(ctx context.Context, cfg settings.ConvertX, fileNa
 	}()
 
 	targetURL := base + "/api/convert"
-	client := &http.Client{Timeout: convertXTimeout(cfg.Timeout)}
+	client := convertClient(cfg, phaseTimeout(cfg.UploadTimeout, 2*time.Hour))
+	defer client.CloseIdleConnections()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, pr)
 	if err != nil {
 		return nil, err
+	}
+	if id, ok := ctx.Value(convertKey{}).(string); ok {
+		req.Header.Set("Idempotency-Key", id)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	addConvertXAuth(req, cfg.APIKey)
@@ -510,7 +464,7 @@ func waitForConvertXOutput(ctx context.Context, cfg settings.ConvertX, submit *c
 		return nil, err
 	}
 
-	client := &http.Client{Timeout: convertXTimeout(cfg.Timeout)}
+	client := convertClient(cfg, convertXTimeout(cfg.Timeout))
 	ticker := time.NewTicker(convertXJobPollInterval)
 	defer ticker.Stop()
 
@@ -559,8 +513,10 @@ func fetchConvertXJob(ctx context.Context, client *http.Client, apiKey, base, jo
 }
 
 func downloadConvertXOutput(ctx context.Context, client *http.Client, apiKey, base, downloadURL string) (io.ReadCloser, error) {
-	if strings.HasPrefix(downloadURL, "/") {
-		downloadURL = base + downloadURL
+	var err error
+	downloadURL, err = sameConvertOrigin(base, downloadURL)
+	if err != nil {
+		return nil, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
@@ -672,28 +628,4 @@ func defaultConvertXDestination(source, convertTo string) string {
 		base = strings.TrimSuffix(name, ".")
 	}
 	return gopath.Join(dir, base+"."+convertTo)
-}
-
-func (s *convertXConversionJobStore) set(jobID string, response convertXConvertResponse) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.cleanupLocked()
-	s.jobs[jobID] = convertXConversionJobEntry{Response: response, UpdatedAt: time.Now()}
-}
-
-func (s *convertXConversionJobStore) get(jobID string) (convertXConvertResponse, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.cleanupLocked()
-	entry, ok := s.jobs[jobID]
-	return entry.Response, ok
-}
-
-func (s *convertXConversionJobStore) cleanupLocked() {
-	cutoff := time.Now().Add(-fileActionJobTTL)
-	for id, entry := range s.jobs {
-		if entry.UpdatedAt.Before(cutoff) {
-			delete(s.jobs, id)
-		}
-	}
 }

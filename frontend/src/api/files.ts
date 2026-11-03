@@ -1,3 +1,4 @@
+import { waitForJob } from "./jobs";
 import { useAuthStore } from "@/stores/auth";
 import { useLayoutStore } from "@/stores/layout";
 import { baseURL } from "@/utils/constants";
@@ -28,7 +29,78 @@ export interface ConvertXConvertResponse {
   done: boolean;
 }
 
-export async function fetch(url: string, signal?: AbortSignal) {
+export async function fetchPage(
+  url: string,
+  page: Partial<DirectoryPage> & { refresh?: boolean } = {},
+  signal?: AbortSignal,
+  previewOnly = false
+): Promise<Resource> {
+  const path = removePrefix(url);
+  const params = new URLSearchParams({
+    paged: "true",
+    limit: String(page.limit || 200),
+    offset: String(page.offset || 0),
+  });
+  for (const key of ["snapshot", "filter", "sort", "asc", "refresh"] as const) {
+    if (page[key] !== undefined) params.set(key, String(page[key]));
+  }
+  let res: Response;
+  try {
+    res = await fetchURL(`/api/resources${path}?${params}`, { signal });
+  } catch (e) {
+    if (
+      e instanceof StatusError &&
+      ((e.status === 409 && page.snapshot) ||
+        (e.status === 400 && (page.offset || 0) > 0))
+    )
+      return fetchPage(
+        url,
+        { ...page, snapshot: "", offset: 0 },
+        signal,
+        previewOnly
+      );
+    throw e;
+  }
+  const data = await res.json();
+  if (res.status === 202 && data.indexing) {
+    const snap = await waitForJob<{ id: string }>(data.jobId, signal);
+    return fetchPage(
+      url,
+      { ...page, snapshot: snap.id, refresh: false },
+      signal,
+      previewOnly
+    );
+  }
+  if (!data.isDir) {
+    if (
+      previewOnly &&
+      data.size > 5 * 1024 * 1024 &&
+      /\.(csv|log|txt|json|ndjson|xml|md)$/i.test(data.name)
+    ) {
+      data.url = `/files${path}`;
+      return data;
+    }
+    return fetchUnpaged(url, signal);
+  }
+  data.url = `/files${path}`;
+  if (!data.url.endsWith("/")) data.url += "/";
+  data.items = data.items.map((item: ResourceItem, index: number) => ({
+    ...item,
+    index,
+    pageVisible: true,
+    url: `${data.url}${encodeURIComponent(item.name)}${item.isDir ? "/" : ""}`,
+  }));
+  return data;
+}
+export async function fetch(
+  url: string,
+  signal?: AbortSignal,
+  previewOnly?: boolean
+) {
+  if (previewOnly === undefined) return fetchUnpaged(url, signal);
+  return fetchPage(url, {}, signal, previewOnly);
+}
+export async function fetchUnpaged(url: string, signal?: AbortSignal) {
   const encoding = isEncodableResponse(url);
   url = removePrefix(url);
   const res = await fetchURL(`/api/resources${url}`, {
@@ -71,7 +143,6 @@ export async function fetch(url: string, signal?: AbortSignal) {
 
   return data;
 }
-
 
 function archiveRoute(archivePath: string, innerPath: string) {
   const inner = innerPath || "/";
@@ -186,7 +257,9 @@ export async function post(
   url: string,
   content: ApiContent = "",
   overwrite = false,
-  onupload: any = () => {}
+  onupload: any = () => {},
+  controlKey?: string,
+  resumeID?: string
 ) {
   // Use the pre-existing API if:
   const useResourcesApi =
@@ -199,7 +272,7 @@ export async function post(
     !(await useTus(content));
   return useResourcesApi
     ? postResources(url, content, overwrite, onupload)
-    : postTus(url, content, overwrite, onupload);
+    : postTus(url, content, overwrite, onupload, controlKey, resumeID);
 }
 
 async function postResources(
@@ -294,7 +367,10 @@ export function getDownloadURL(file: ResourceItem, inline: any) {
 
   if (file.archivePath && file.archiveInnerPath) {
     params.inner = file.archiveInnerPath;
-    return createURL("api/archive/raw" + removePrefix(file.archivePath), params);
+    return createURL(
+      "api/archive/raw" + removePrefix(file.archivePath),
+      params
+    );
   }
 
   return createURL("api/raw" + file.path, params);
@@ -312,7 +388,6 @@ export function getPreviewURL(file: ResourceItem, size: string) {
 
   return createURL("api/preview/" + size + file.path, params);
 }
-
 
 export async function extractArchive(
   archiveURL: string,
@@ -334,20 +409,27 @@ export async function extractArchive(
   const res = await fetchURL(`/api/archive/extract${archivePath}?${params}`, {
     method: "POST",
   });
-  return (await res.json()) as { destination: string; extracted: number };
+  const data = await res.json();
+  return data.jobId
+    ? waitForJob<{ destination: string; extracted: number }>(data.jobId)
+    : data;
 }
-
 
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-async function pollClamAVScanJob(jobId: string): Promise<ClamAVPathScanResponse> {
+async function pollClamAVScanJob(
+  jobId: string
+): Promise<ClamAVPathScanResponse> {
   for (;;) {
     await wait(1500);
-    const res = await fetchURL(`/api/clamav/jobs/${encodeURIComponent(jobId)}`, {
-      method: "GET",
-    });
+    const res = await fetchURL(
+      `/api/clamav/jobs/${encodeURIComponent(jobId)}`,
+      {
+        method: "GET",
+      }
+    );
     const result = (await res.json()) as ClamAVPathScanResponse;
 
     if (result.done || ["clean", "infected", "error"].includes(result.status)) {
@@ -359,12 +441,17 @@ async function pollClamAVScanJob(jobId: string): Promise<ClamAVPathScanResponse>
   }
 }
 
-async function pollArchiveCreateJob(jobId: string): Promise<ArchiveCreateResponse> {
+async function pollArchiveCreateJob(
+  jobId: string
+): Promise<ArchiveCreateResponse> {
   for (;;) {
     await wait(1500);
-    const res = await fetchURL(`/api/archive/jobs/${encodeURIComponent(jobId)}`, {
-      method: "GET",
-    });
+    const res = await fetchURL(
+      `/api/archive/jobs/${encodeURIComponent(jobId)}`,
+      {
+        method: "GET",
+      }
+    );
     const result = (await res.json()) as ArchiveCreateResponse;
 
     if (result.done || ["done", "error"].includes(result.status || "")) {
@@ -376,7 +463,9 @@ async function pollArchiveCreateJob(jobId: string): Promise<ArchiveCreateRespons
   }
 }
 
-export async function scanWithClamAV(file: ResourceItem): Promise<ClamAVPathScanResponse> {
+export async function scanWithClamAV(
+  file: ResourceItem
+): Promise<ClamAVPathScanResponse> {
   const scanPath = removePrefix(file.url);
   const res = await fetchURL(`/api/clamav/scan${scanPath}`, {
     method: "POST",
@@ -425,14 +514,17 @@ export async function createArchive(
   return result;
 }
 
-
-
-async function pollConvertXJob(jobId: string): Promise<ConvertXConvertResponse> {
+async function pollConvertXJob(
+  jobId: string
+): Promise<ConvertXConvertResponse> {
   for (;;) {
     await wait(1500);
-    const res = await fetchURL(`/api/convertx/jobs/${encodeURIComponent(jobId)}`, {
-      method: "GET",
-    });
+    const res = await fetchURL(
+      `/api/convertx/jobs/${encodeURIComponent(jobId)}`,
+      {
+        method: "GET",
+      }
+    );
     const result = (await res.json()) as ConvertXConvertResponse;
 
     if (result.done || ["done", "error"].includes(result.status || "")) {
@@ -444,10 +536,14 @@ async function pollConvertXJob(jobId: string): Promise<ConvertXConvertResponse> 
   }
 }
 
-export async function getConvertXTargets(file: ResourceItem): Promise<ConvertXTargetsResponse> {
+export async function getConvertXTargets(
+  file: ResourceItem
+): Promise<ConvertXTargetsResponse> {
   const ext = (file.extension || "").replace(/^\./, "").toLowerCase();
   if (!ext) {
-    throw new Error("The selected file has no extension, so ConvertX cannot detect its source format.");
+    throw new Error(
+      "The selected file has no extension, so ConvertX cannot detect its source format."
+    );
   }
 
   const params = new URLSearchParams({ from: ext });

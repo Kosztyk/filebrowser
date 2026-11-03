@@ -1,12 +1,10 @@
 package fileutils
 
 import (
-	"io"
 	"io/fs"
-	"os"
 	"path"
-	"path/filepath"
 
+	"github.com/filebrowser/filebrowser/v2/files"
 	"github.com/spf13/afero"
 )
 
@@ -14,13 +12,18 @@ import (
 // By default the rename filesystem system call is used. If src and dst point to different volumes
 // the file copy is used as a fallback
 func MoveFile(afs afero.Fs, src, dst string, fileMode, dirMode fs.FileMode) error {
-	if afs.Rename(src, dst) == nil {
+	if files.GuardMutation(afs, []string{src, dst}, func() error { return afs.Rename(src, dst) }) == nil {
 		return nil
+	}
+	if err := files.CheckMutation(afs, src); err != nil {
+		return err
+	}
+	if err := files.CheckMutation(afs, dst); err != nil {
+		return err
 	}
 	// fallback
 	err := Copy(afs, src, dst, fileMode, dirMode)
 	if err != nil {
-		_ = afs.Remove(dst)
 		return err
 	}
 	if err := afs.RemoveAll(src); err != nil {
@@ -31,7 +34,7 @@ func MoveFile(afs afero.Fs, src, dst string, fileMode, dirMode fs.FileMode) erro
 
 // CopyFile copies a file from source to dest and returns
 // an error if any.
-func CopyFile(afs afero.Fs, source, dest string, fileMode, dirMode fs.FileMode) error {
+func CopyFile(afs afero.Fs, source, dest string, _, dirMode fs.FileMode) error {
 	// Open the source file.
 	src, err := afs.Open(source)
 	if err != nil {
@@ -39,37 +42,12 @@ func CopyFile(afs afero.Fs, source, dest string, fileMode, dirMode fs.FileMode) 
 	}
 	defer src.Close()
 
-	// Makes the directory needed to create the dst
-	// file.
-	err = afs.MkdirAll(filepath.Dir(dest), dirMode)
+	info, err := src.Stat()
 	if err != nil {
 		return err
 	}
-
-	// Create the destination file.
-	dst, err := afs.OpenFile(dest, os.O_RDWR|os.O_CREATE|os.O_TRUNC, fileMode)
-	if err != nil {
-		return err
-	}
-	defer dst.Close()
-
-	// Copy the contents of the file.
-	_, err = io.Copy(dst, src)
-	if err != nil {
-		return err
-	}
-
-	// Copy the mode
-	info, err := afs.Stat(source)
-	if err != nil {
-		return err
-	}
-	err = afs.Chmod(dest, info.Mode())
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err = files.AtomicWrite(afs, dest, src, info.Mode().Perm(), dirMode)
+	return err
 }
 
 // CommonPrefix returns common directory path of provided files

@@ -1,0 +1,28 @@
+diff --git a/dist/default/dom/store/features/playback-rate.js b/dist/default/dom/store/features/playback-rate.js
+--- a/dist/default/dom/store/features/playback-rate.js
++++ b/dist/default/dom/store/features/playback-rate.js
+@@ -10,7 +10,9 @@ const DEFAULT_RATES = [
+ 	1.2,
+ 	1.5,
+ 	1.7,
+-	2
++	2,
++	2.5,
++	3
+ ];
+ const playbackRateFeature = definePlayerFeature({
+ 	name: "playbackRate",
+diff --git a/dist/dev/dom/store/features/playback-rate.js b/dist/dev/dom/store/features/playback-rate.js
+--- a/dist/dev/dom/store/features/playback-rate.js
++++ b/dist/dev/dom/store/features/playback-rate.js
+@@ -10,7 +10,9 @@ const DEFAULT_RATES = [
+ 	1.2,
+ 	1.5,
+ 	1.7,
+-	2
++	2,
++	2.5,
++	3
+ ];
+ const playbackRateFeature = definePlayerFeature({
+ 	name: "playbackRate",

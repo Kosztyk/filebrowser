@@ -7,14 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"mime/multipart"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/spf13/afero"
 
 	"github.com/filebrowser/filebrowser/v2/settings"
 )
@@ -46,16 +42,17 @@ func (e *clamAVThreatError) Error() string {
 
 	switch {
 	case threat != "":
-		return fmt.Sprintf("Security scan blocked the upload. Malware was detected in %q. Threat: %s. The file was removed and was not saved.", fileName, threat)
+		return fmt.Sprintf("Security scan blocked the upload. Malware was detected in %q. Threat: %s. The upload was not published; any previous destination was preserved.", fileName, threat)
 	case details != "":
-		return fmt.Sprintf("Security scan blocked the upload. Malware was detected in %q. Scanner details: %s. The file was removed and was not saved.", fileName, details)
+		return fmt.Sprintf("Security scan blocked the upload. Malware was detected in %q. Scanner details: %s. The upload was not published; any previous destination was preserved.", fileName, details)
 	default:
-		return fmt.Sprintf("Security scan blocked the upload. Malware was detected in %q. The file was removed and was not saved.", fileName)
+		return fmt.Sprintf("Security scan blocked the upload. Malware was detected in %q. The upload was not published; any previous destination was preserved.", fileName)
 	}
 }
 
 type clamAVServiceError struct {
 	Message string
+	Unknown bool
 }
 
 func (e *clamAVServiceError) Error() string {
@@ -93,33 +90,6 @@ func clamAVHTTPStatus(err error) int {
 	return errToStatus(err)
 }
 
-func scanUploadedFile(ctx context.Context, fs afero.Fs, filePath string, cfg settings.ClamAV) error {
-	if !cfg.Enabled {
-		return nil
-	}
-
-	info, err := fs.Stat(filePath)
-	if err != nil {
-		return &clamAVServiceError{Message: fmt.Sprintf("could not stat uploaded file before scanning: %v", err)}
-	}
-	if !info.IsDir() && shouldBypassAutomaticClamAV(info.Size()) {
-		log.Printf("ClamAV upload scan skipped: path=%q bytes=%d max_scan_bytes=%d", filePath, info.Size(), clamAVAutomaticScanMaxBytes)
-		return nil
-	}
-
-	if strings.TrimSpace(cfg.URL) == "" {
-		return &clamAVServiceError{Message: "scanner is enabled but no ClamAV URL is configured"}
-	}
-
-	file, err := fs.Open(filePath)
-	if err != nil {
-		return &clamAVServiceError{Message: fmt.Sprintf("could not open uploaded file for scanning: %v", err)}
-	}
-	defer file.Close()
-
-	return scanWithClamAV(ctx, cfg, filepath.Base(filePath), file)
-}
-
 func testClamAVConnection(ctx context.Context, cfg settings.ClamAV) error {
 	if strings.TrimSpace(cfg.URL) == "" {
 		return &clamAVServiceError{Message: "no ClamAV URL is configured"}
@@ -135,6 +105,7 @@ func scanWithClamAV(ctx context.Context, cfg settings.ClamAV, filename string, r
 	}
 
 	bodyReader, bodyWriter := io.Pipe()
+	defer bodyReader.Close()
 	multipartWriter := multipart.NewWriter(bodyWriter)
 
 	go func() {
@@ -183,11 +154,14 @@ func scanWithClamAV(ctx context.Context, cfg settings.ClamAV, filename string, r
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, (1<<20)+1))
 	if err != nil {
 		return &clamAVServiceError{Message: fmt.Sprintf("could not read scanner response: %v", err)}
 	}
 
+	if len(body) > 1<<20 {
+		return &clamAVServiceError{Message: "scanner result exceeds limit", Unknown: true}
+	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		if threat := evaluateClamAVResponse(filename, body); threat != nil {
 			return threat
@@ -208,32 +182,29 @@ func scanWithClamAV(ctx context.Context, cfg settings.ClamAV, filename string, r
 func evaluateClamAVResponse(filename string, body []byte) error {
 	trimmed := bytes.TrimSpace(body)
 	if len(trimmed) == 0 {
-		return nil
+		return &clamAVServiceError{Message: "scanner returned an empty result", Unknown: true}
 	}
-
 	var parsed any
-	if err := json.Unmarshal(trimmed, &parsed); err == nil {
+	if json.Unmarshal(trimmed, &parsed) == nil {
 		if infected, threat, details := jsonContainsInfection(parsed); infected {
 			return &clamAVThreatError{FileName: filename, Threat: threat, Details: details}
 		}
-
 		if success, ok := jsonBoolField(parsed, "success"); ok && !success {
-			message := firstJSONString(parsed, "message", "error", "detail")
-			if message == "" {
-				message = string(trimmed)
-			}
-			return &clamAVServiceError{Message: message}
+			return &clamAVServiceError{Message: firstJSONString(parsed, "message", "error", "detail")}
 		}
-
-		return nil
+		if explicitCleanJSON(parsed) {
+			return nil
+		}
+		return &clamAVServiceError{Message: "scanner returned an unrecognized or incomplete result", Unknown: true}
 	}
-
 	upper := strings.ToUpper(string(trimmed))
-	if strings.Contains(upper, "FOUND") || strings.Contains(upper, "INFECTED") {
+	if strings.Contains(upper, " FOUND") || upper == "INFECTED" {
 		return &clamAVThreatError{FileName: filename, Threat: extractClamAVTextThreat(string(trimmed)), Details: string(trimmed)}
 	}
-
-	return nil
+	if explicitCleanText(string(trimmed)) {
+		return nil
+	}
+	return &clamAVServiceError{Message: "scanner returned an unrecognized result", Unknown: true}
 }
 
 func jsonContainsInfection(value any) (bool, string, string) {

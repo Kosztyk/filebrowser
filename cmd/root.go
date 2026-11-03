@@ -186,10 +186,8 @@ user created with the credentials from options "username" and "password".`,
 			fileCache = diskcache.New(afero.NewOsFs(), cacheDir)
 		}
 
-		redisCacheURL := v.GetString("redisCacheUrl")
-		uploadCache, err := fbhttp.NewUploadCache(redisCacheURL)
-		if err != nil {
-			return fmt.Errorf("failed to initialize upload cache: %w", err)
+		if v.GetString("redisCacheUrl") != "" {
+			log.Println("Upload state now uses the instance-local database journal; redisCacheUrl is retained for configuration compatibility")
 		}
 
 		server, err := getServerSettings(v, st.Storage)
@@ -208,6 +206,15 @@ user created with the credentials from options "username" and "password".`,
 			return err
 		}
 		server.Root = root
+		databasePath, err := filepath.Abs(v.GetString("database"))
+		if err != nil {
+			return err
+		}
+		uploadCache, err := fbhttp.NewUploadManager(databasePath+".uploads.db", st.Storage, server, false)
+		if err != nil {
+			return fmt.Errorf("initialize upload journal: %w", err)
+		}
+		defer uploadCache.Close()
 
 		adr := server.Address + ":" + server.Port
 
@@ -252,6 +259,9 @@ user created with the credentials from options "username" and "password".`,
 		if err != nil {
 			return err
 		}
+
+		// Start recovery workers after handler setup finishes normalizing server settings.
+		uploadCache.Start()
 
 		defer listener.Close()
 

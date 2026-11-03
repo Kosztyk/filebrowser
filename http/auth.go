@@ -122,7 +122,12 @@ func withUser(fn handleFunc) handleFunc {
 		var tk authToken
 		p := jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired())
 		token, err := request.ParseFromRequest(r, &extractor{}, keyFunc, request.WithClaims(&tk), request.WithParser(p))
-		if (err != nil || !token.Valid) && !renewableErr(err, r, d, &tk) {
+		sessionRenewal := false
+		if err != nil && errors.Is(err, jwt.ErrTokenExpired) && r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/renew") && tk.ID != "" && tk.ExpiresAt != nil {
+			verified, verifyErr := request.ParseFromRequest(r, &extractor{}, keyFunc, request.WithClaims(&tk), request.WithParser(jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithoutClaimsValidation())))
+			sessionRenewal = verifyErr == nil && verified != nil && verified.Valid
+		}
+		if (err != nil || !token.Valid) && !sessionRenewal && !renewableErr(err, r, d, &tk) {
 			return http.StatusUnauthorized, nil
 		}
 
@@ -138,6 +143,13 @@ func withUser(fn handleFunc) handleFunc {
 			return http.StatusInternalServerError, err
 		}
 
+		if !sessionValid(r, d, &tk) {
+			return http.StatusUnauthorized, nil
+		}
+		d.idempotency = r.Header.Get("Idempotency-Key")
+		if len(d.idempotency) > 128 {
+			return http.StatusBadRequest, errors.New("idempotency key exceeds 128 bytes")
+		}
 		canonicalizeRequestPath(r)
 		return fn(w, r, d)
 	}
@@ -249,7 +261,12 @@ func renewHandler(tokenExpireTime time.Duration) handleFunc {
 	})
 }
 
-func printToken(w http.ResponseWriter, _ *http.Request, d *data, user *users.User, tokenExpirationTime time.Duration) (int, error) {
+func printToken(w http.ResponseWriter, r *http.Request, d *data, user *users.User, tokenExpirationTime time.Duration) (int, error) {
+	sid, err := mintSession(r, d, user.ID, user.Password)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	d.sessionID = sid
 	claims := &authToken{
 		User: userInfo{
 			ID:                    user.ID,
@@ -266,8 +283,9 @@ func printToken(w http.ResponseWriter, _ *http.Request, d *data, user *users.Use
 			AceEditorTheme:        user.AceEditorTheme,
 		},
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        sid,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenExpirationTime)),
+			ExpiresAt: jwt.NewNumericDate(sessionExpiry(d, time.Now().Add(tokenExpirationTime))),
 			Issuer:    "File Browser",
 		},
 	}

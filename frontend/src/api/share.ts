@@ -1,3 +1,4 @@
+import { waitForJob } from "./jobs";
 import { fetchURL, fetchJSON, removePrefix, createURL } from "./utils";
 
 export interface ShareConfig {
@@ -102,13 +103,14 @@ export async function createErugo(url: string, options: ShareCreateOptions) {
     downloadSpeedLimitKbps: options.downloadSpeedLimitKbps ?? 0,
   });
 
-  return fetchJSON<Share>(url, {
+  const result = await fetchJSON<Share & { jobId?: string }>(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body,
   });
+  return result.jobId ? waitForJob<Share>(result.jobId) : result;
 }
 
 /** Create an Erugo reverse-share invitation through File Browser's backend. */

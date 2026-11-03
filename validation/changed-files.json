@@ -1,0 +1,42 @@
+{
+  "modified": [
+    ".dockerignore",
+    ".github/workflows/ci.yaml",
+    ".github/workflows/lint-pr.yaml",
+    ".gitignore",
+    ".goreleaser.yml",
+    "CONTRIBUTING.md",
+    "Dockerfile",
+    "Dockerfile.s6",
+    "README.md",
+    "Taskfile.yml",
+    "cmd/utils.go",
+    "compose.yaml",
+    "frontend/package.json",
+    "frontend/pnpm-lock.yaml",
+    "frontend/src/api/collabora.ts",
+    "frontend/src/api/files.ts",
+    "frontend/src/components/files/ListingItem.vue",
+    "frontend/src/types/api.d.ts",
+    "frontend/src/types/file.d.ts",
+    "frontend/src/views/Files.vue",
+    "frontend/src/views/Layout.vue",
+    "frontend/src/views/files/Collabora.vue",
+    "frontend/src/views/files/Editor.vue",
+    "frontend/src/views/files/Preview.vue",
+    "frontend/src/views/files/__tests__/upload-conflict-resolution.test.ts",
+    "frontend/src/views/settings/Global.vue",
+    "frontend/tsconfig.node.json",
+    "frontend/vite.config.ts",
+    "go.mod",
+    "go.sum",
+    "http/archive.go",
+    "http/collabora.go",
+    "http/erugo.go",
+    "www/Dockerfile",
+    "www/requirements.txt"
+  ],
+  "removed": [
+    "frontend/src/components/files/VideoPlayer.vue"
+  ]
+}

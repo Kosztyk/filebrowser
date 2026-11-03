@@ -1,0 +1,95 @@
+$ playwright test
+[WebServer] (node:115) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:150) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 3 tests using 1 worker
+
+(node:194) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 [chromium] › tests/browser/compatibility.spec.ts:3:1 › Video.js 10 plays media and exposes captions, speed and fullscreen controls (5.6s)
+(node:254) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] 9:01:40 PM [vite] (client) [Unhandled error] Error: ResizeObserver loop completed with undelivered notifications.
+[WebServer]  > ../../../../../../@vite/client:374:50
+[WebServer] 
+  ✓  2 [chromium] › tests/browser/compatibility.spec.ts:67:1 › Vue Reader renders a zipped EPUB and reports its CFI location (680ms)
+  ✘  3 [chromium] › tests/browser/compatibility.spec.ts:79:1 › browser math preview is sanitized and retains MathML (45ms)
+
+
+  1) [chromium] › tests/browser/compatibility.spec.ts:3:1 › Video.js 10 plays media and exposes captions, speed and fullscreen controls 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 3
+    Received: 1.7
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      36 |   await expect
+      37 |     .poll(() => video.evaluate((element: HTMLVideoElement) => element.playbackRate))
+    > 38 |     .toBe(3);
+         |      ^
+      39 |   await page.keyboard.press("ArrowRight");
+      40 |   await expect
+      41 |     .poll(() =>
+        at /workspace/scratch/989234643726/batch1/filebrowser/frontend/tests/browser/compatibility.spec.ts:38:6
+
+    Error Context: test-results/compatibility-Video-js-10--d3916-eed-and-fullscreen-controls-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/compatibility-Video-js-10--d3916-eed-and-fullscreen-controls-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/compatibility-Video-js-10--d3916-eed-and-fullscreen-controls-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › tests/browser/compatibility.spec.ts:79:1 › browser math preview is sanitized and retains MathML 
+
+    Error: browserContext.newPage: Target page, context or browser has been closed
+    Browser logs:
+
+    <launching> /workspace/scratch/989234643726/batch1-tools/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,AvoidCorsURLLoaderRestartOnRedirect,Translate,AutoDeElevate,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --no-zygote --single-process --user-data-dir=/tmp/playwright_chromiumdev_profile-lUETZq --remote-debugging-pipe --no-startup-window
+    <launched> pid=266
+    [pid=266][err] [1102/210139.802837:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Failed to open socket: Operation not permitted
+    [pid=266][err] [1102/210139.802939:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+    [pid=266][err] [1102/210139.808382:ERROR:net/base/address_tracker_linux.cc:224] Could not create NETLINK socket: Operation not permitted (1)
+    [pid=266][err] [1102/210139.808494:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Failed to open socket: Operation not permitted
+    [pid=266][err] [1102/210139.808532:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Failed to open socket: Operation not permitted
+    [pid=266][err] socket(): Operation not permitted
+    [pid=266][err] socket(): Operation not permitted
+    [pid=266][err] [1102/210139.812305:WARNING:media/audio/linux/audio_manager_linux.cc:53] Falling back to ALSA for audio output. PulseAudio is not available or could not be initialized.
+    [pid=266][err] [1102/210139.812587:ERROR:device/udev_linux/udev_watcher.cc:51] Failed to initialize a udev monitor.
+    [pid=266][err] [1102/210139.815448:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+    [pid=266][err] [1102/210139.815550:WARNING:device/bluetooth/dbus/bluez_dbus_manager.cc:209] Floss manager service not available, cannot set Floss enable/disable.
+    [pid=266][err] [1102/210139.816070:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+    [pid=266][err] [1102/210139.820222:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+    [pid=266][err] [1102/210139.820811:WARNING:media/gpu/vaapi/vaapi_wrapper.cc:1655] drmGetDevices2() has not found any devices
+    [pid=266][err] [1102/210140.008606:INFO:CONSOLE:946] "[vite] connecting...", source: http://127.0.0.1:5175/@vite/client (946)
+    [pid=266][err] [1102/210140.120621:INFO:CONSOLE:1055] "[vite] connected.", source: http://127.0.0.1:5175/@vite/client (1055)
+    [pid=266][err] [1102/210140.384574:INFO:CONSOLE:0] "Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.", source: about:srcdoc (0)
+    [pid=266][err] [1102/210140.384662:INFO:CONSOLE:0] "Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.", source: about:srcdoc (0)
+    [pid=266][err] [1102/210140.392204:INFO:CONSOLE:0] "Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.", source: about:srcdoc (0)
+    [pid=266][err] [1102/210140.411731:INFO:CONSOLE:0] "Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.", source: about:srcdoc (0)
+    [pid=266][err] [1102/210140.414068:INFO:CONSOLE:0] "Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.", source: about:srcdoc (0)
+    [pid=266][err] [1102/210140.457375:INFO:CONSOLE:8150] "Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.", source:  (8150)
+    [pid=266][err] [1102/210140.457426:INFO:CONSOLE:8157] "Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.", source:  (8157)
+
+    Error Context: test-results/compatibility-browser-math-7d3cf-anitized-and-retains-MathML-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/compatibility-browser-math-7d3cf-anitized-and-retains-MathML-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/compatibility-browser-math-7d3cf-anitized-and-retains-MathML-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    [chromium] › tests/browser/compatibility.spec.ts:3:1 › Video.js 10 plays media and exposes captions, speed and fullscreen controls 
+    [chromium] › tests/browser/compatibility.spec.ts:79:1 › browser math preview is sanitized and retains MathML 
+  1 passed (9.0s)
+[ELIFECYCLE] Command failed with exit code 1.

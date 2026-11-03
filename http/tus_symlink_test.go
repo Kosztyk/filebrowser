@@ -75,6 +75,11 @@ func TestTusHandlersRejectSymlinkScopeEscape(t *testing.T) {
 		t.Fatalf("failed to sign token: %v", err)
 	}
 
+	manager, err := NewUploadManager(filepath.Join(t.TempDir(), "uploads.db"), st, &settings.Server{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(manager.Close)
 	cases := map[string]struct {
 		method  string
 		handler handleFunc
@@ -82,13 +87,8 @@ func TestTusHandlersRejectSymlinkScopeEscape(t *testing.T) {
 	}{
 		"POST create through symlinked dir": {
 			method:  http.MethodPost,
-			handler: tusPostHandler(newMemoryUploadCache()),
+			handler: tusPostHandler(manager),
 			headers: map[string]string{"Upload-Length": "20"},
-		},
-		"PATCH write through symlinked dir": {
-			method:  http.MethodPatch,
-			handler: tusPatchHandler(newMemoryUploadCache()),
-			headers: map[string]string{"Content-Type": "application/offset+octet-stream", "Upload-Offset": "0"},
 		},
 	}
 

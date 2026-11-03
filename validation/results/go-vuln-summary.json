@@ -1,0 +1,14 @@
+{
+  "findings": [
+    {
+      "osv": "GO-2026-5932",
+      "trace": [
+        {
+          "module": "golang.org/x/crypto",
+          "version": "v0.58.0"
+        }
+      ]
+    }
+  ],
+  "reachable_symbols": 0
+}

@@ -1,0 +1,17 @@
+
+[33m │  [1mMaterial for MkDocs reaches end of life on May 5, 2027.[0m
+[33m │[0m  Critical fixes and security updates continue until that date.
+[33m │[0m
+[33m │[0m  Zensical is its maintained successor, built by the same team.
+[33m │[0m  Try it alongside MkDocs with your existing mkdocs.yml:
+[33m │[0m  [36m[4mhttps://zensical.org/docs/compatibility/mkdocs/migration/[0m
+[33m │[0m
+[33m │[0m  A third-party plugin may print a separate notice recommending
+[33m │[0m  ProperDocs. That notice is not from the Material for MkDocs
+[33m │[0m  team and does not represent a recommendation from us.
+
+[90m  To disable this warning, set NO_MKDOCS_2_WARNING=1.[0m
+
+INFO    -  Cleaning site directory
+INFO    -  Building documentation to directory: /workspace/scratch/989234643726/upgrade-evidence/docs-site
+INFO    -  Documentation built in 1.63 seconds

@@ -84,7 +84,6 @@ import url from "@/utils/url";
 import ace, { Ace, version as ace_version } from "ace-builds";
 import "ace-builds/src-noconflict/ext-language_tools";
 import modelist from "ace-builds/src-noconflict/ext-modelist";
-import DOMPurify from "dompurify";
 
 import Breadcrumbs from "@/components/Breadcrumbs.vue";
 import Action from "@/components/header/Action.vue";
@@ -93,8 +92,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useFileStore } from "@/stores/file";
 import { useLayoutStore } from "@/stores/layout";
 import { getEditorTheme } from "@/utils/theme";
-import { marked } from "marked";
-import markedKatex from "marked-katex-extension";
+import { renderMarkdown } from "@/utils/markdown";
 import { inject, onBeforeUnmount, onMounted, ref, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import { onBeforeRouteUpdate, useRoute, useRouter } from "vue-router";
@@ -119,11 +117,6 @@ const previewContent = ref("");
 const isMarkdownFile =
   fileStore.req?.name.endsWith(".md") ||
   fileStore.req?.name.endsWith(".markdown");
-const katexOptions = {
-  output: "mathml" as const,
-  throwOnError: false,
-};
-marked.use(markedKatex(katexOptions));
 
 const isSelectionEmpty = ref(true);
 
@@ -164,7 +157,7 @@ onMounted(() => {
     if (isMarkdownFile && isPreview.value) {
       const new_value = editor.value?.getValue() || "";
       try {
-        previewContent.value = DOMPurify.sanitize(await marked(new_value));
+        previewContent.value = await renderMarkdown(new_value);
       } catch (error) {
         console.error("Failed to convert content to HTML:", error);
         previewContent.value = "";

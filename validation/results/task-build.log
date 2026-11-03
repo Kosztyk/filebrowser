@@ -1,0 +1,121 @@
+task: [build:frontend] pnpm install --frozen-lockfile
+Agent skills awaiting approval: qrcode.vue.
+Run "pnpm approve" to review them.
+? Verifying lockfile against supply-chain policies (626 entries)...
+✓ Lockfile passes supply-chain policies (626 entries in 8.2s)
+Lockfile is up to date, resolution step is skipped
+Done in 8.5s using pnpm v12.16.1
+task: [build:frontend] pnpm run build
+$ pnpm run typecheck && vite build
+$ pnpm run typecheck:vue && pnpm run typecheck:native && pnpm run typecheck:config
+$ vue-tsc -p ./tsconfig.app.json --noEmit
+$ tsc -p ./tsconfig.native.json --noEmit
+$ tsc -p ./tsconfig.node.json --noEmit
+vite v8.3.5 building client environment for production...
+transforming...
+<script src="[{[ .ReCaptchaHost ]}]/recaptcha/api.js?render=explicit"> in "/public/index.html" can't be bundled without type="module" attribute
+
+[{[ .StaticURL ]}]/custom.css doesn't exist at build time, it will remain unchanged to be resolved at runtime
+✓ 1580 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/assets/rolldown-runtime-legacy-C3AR840j.js.br      0.58 kB
+dist/assets/rolldown-runtime-legacy-C3AR840j.js.gz      0.66 kB
+dist/assets/Collabora-legacy-Dsm4mCMk.js.br             1.65 kB
+dist/assets/Collabora-legacy-Dsm4mCMk.js.gz             1.95 kB
+dist/assets/dayjs-legacy-DU5OGvDa.js.br                12.72 kB
+dist/assets/dayjs-legacy-DU5OGvDa.js.gz                15.23 kB
+dist/assets/polyfills-legacy-CGKzcH86.js.br            22.83 kB
+dist/assets/polyfills-legacy-CGKzcH86.js.gz            25.75 kB
+dist/assets/Editor-legacy-PAG4c4-9.js.br              105.84 kB
+dist/assets/Editor-legacy-PAG4c4-9.js.gz              126.01 kB
+dist/assets/i18n-legacy-BLeUbr_9.js.br                180.24 kB
+dist/assets/Preview-legacy-iIstm9Hj.js.br             207.70 kB
+dist/assets/index-legacy-BMUOtGWo.js.br               216.47 kB
+dist/assets/i18n-legacy-BLeUbr_9.js.gz                239.99 kB
+dist/assets/Preview-legacy-iIstm9Hj.js.gz             259.24 kB
+dist/assets/index-legacy-BMUOtGWo.js.gz               262.01 kB
+dist/assets/rolldown-runtime-legacy-C3AR840j.js         1.20 kB │ gzip:   0.66 kB
+dist/assets/Collabora-legacy-Dsm4mCMk.js                4.12 kB │ gzip:   1.95 kB
+dist/assets/dayjs-legacy-DU5OGvDa.js                   57.85 kB │ gzip:  15.32 kB
+dist/assets/polyfills-legacy-CGKzcH86.js               73.34 kB │ gzip:  26.05 kB
+dist/assets/Editor-legacy-PAG4c4-9.js                 407.37 kB │ gzip: 127.38 kB
+dist/assets/index-legacy-BMUOtGWo.js                  921.81 kB │ gzip: 264.47 kB
+dist/assets/Preview-legacy-iIstm9Hj.js                929.02 kB │ gzip: 261.81 kB
+dist/assets/i18n-legacy-BLeUbr_9.js                 1,267.45 kB │ gzip: 258.58 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+transforming...
+<script src="[{[ .ReCaptchaHost ]}]/recaptcha/api.js?render=explicit"> in "/public/index.html" can't be bundled without type="module" attribute
+✓ 1580 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/assets/rolldown-runtime-COiEfhsA.js.br         0.54 kB
+dist/assets/rolldown-runtime-COiEfhsA.js.gz         0.62 kB
+dist/assets/Collabora-DhWr9N2-.js.br                1.32 kB
+dist/assets/Collabora-DhWr9N2-.js.gz                1.51 kB
+dist/assets/medium-vietnamese-CqtfC5E6.woff2        4.78 kB
+dist/assets/normal-vietnamese-BFW_PrBQ.woff2        4.89 kB
+dist/public/index.html                              5.49 kB │ gzip:   2.10 kB
+dist/assets/medium-greek-CYrUg8_A.woff2             7.17 kB
+dist/assets/bold-vietnamese-9GZUqT2t.woff2          7.20 kB
+dist/assets/normal-greek-DzgR_hcO.woff2             7.20 kB
+dist/assets/bold-greek-CZts-Xup.woff2               9.48 kB
+dist/assets/normal-cyrillic-DIIsSwSF.woff2          9.99 kB
+dist/assets/medium-cyrillic-CkXvmKJs.woff2         10.06 kB
+dist/assets/bold-cyrillic--c625Tgp.woff2           11.67 kB
+dist/assets/medium-latin-ext-BKjnCq26.woff2        11.91 kB
+dist/assets/normal-latin-ext-vBxM5Tkz.woff2        12.00 kB
+dist/assets/dayjs-BYitjB00.js.br                   12.80 kB
+dist/assets/normal-latin-44DxGZCZ.woff2            14.58 kB
+dist/assets/medium-latin-qoGZqeje.woff2            14.59 kB
+dist/assets/bold-latin-ext-TvF7z9v-.woff2          15.14 kB
+dist/assets/medium-cyrillic-ext-Cs9Yeg2Z.woff2     15.29 kB
+dist/assets/dayjs-BYitjB00.js.gz                   15.34 kB
+dist/assets/normal-cyrillic-ext-BmhtxWN4.woff2     15.83 kB
+dist/assets/bold-cyrillic-ext-E0dvYyMz.woff2       17.17 kB
+dist/assets/bold-latin-CiQBian2.woff2              18.12 kB
+dist/assets/Editor-Btvn9ftn.js.br                 104.66 kB
+dist/assets/Editor-Btvn9ftn.js.gz                 123.28 kB
+dist/assets/material-icons-kAwBdRge.woff2         128.35 kB
+dist/assets/material-icons-Dr0goTwe.woff          164.91 kB
+dist/assets/i18n-BTxvW3zp.js.br                   180.47 kB
+dist/assets/index-Y4mNN2Ns.js.br                  198.86 kB
+dist/assets/Preview-CzWL8gZ2.js.br                205.21 kB
+dist/assets/index-Y4mNN2Ns.js.gz                  239.52 kB
+dist/assets/i18n-BTxvW3zp.js.gz                   239.60 kB
+dist/assets/Preview-CzWL8gZ2.js.gz                253.02 kB
+dist/assets/Editor-DT_2qN00.css                     0.51 kB │ gzip:   0.25 kB
+dist/assets/Collabora-CDL6nTnG.css                  0.67 kB │ gzip:   0.33 kB
+dist/assets/Preview-C3yqrSpQ.css                    8.03 kB │ gzip:   1.93 kB
+dist/assets/index-JIaEPc3C.css                     67.95 kB │ gzip:  18.95 kB
+dist/assets/rolldown-runtime-COiEfhsA.js            1.11 kB │ gzip:   0.62 kB
+dist/assets/Collabora-DhWr9N2-.js                   3.21 kB │ gzip:   1.51 kB
+dist/assets/dayjs-BYitjB00.js                      57.99 kB │ gzip:  15.43 kB
+dist/assets/Editor-Btvn9ftn.js                    404.79 kB │ gzip: 124.67 kB
+dist/assets/index-Y4mNN2Ns.js                     849.57 kB │ gzip: 242.04 kB
+dist/assets/Preview-CzWL8gZ2.js                   917.75 kB │ gzip: 255.53 kB
+dist/assets/i18n-BTxvW3zp.js                    1,268.73 kB │ gzip: 258.18 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 39.28s
+
+[33m[PLUGIN_TIMINGS] [0mJavaScript callbacks ran for 36.2s of this 39.2s build (92%).
+The slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - plugin vite:legacy-post-process renderChunk (64%, 25.2s, 14 calls)
+  - plugin vite-plugin-compression:runner generateBundle (19%, 7.4s, 2 calls)
+Additional callback time came from the callbacks below and from callbacks under 1s.
+2 callbacks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:
+  - plugin unplugin-vue-i18n:resource load (3138 calls)
+  - plugin vite:css transform (40 calls)
+See https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.
+
+task: [build:backend] go build -buildvcs=false -ldflags='-s -w -X "github.com/filebrowser/filebrowser/v2/version.Version=3.1.0" -X "github.com/filebrowser/filebrowser/v2/version.CommitSHA=cc1a3a8"' -o filebrowser .

@@ -3,6 +3,8 @@ import { defineStore } from "pinia";
 export const useFileStore = defineStore("file", {
   // convert to a function
   state: (): {
+    requestVersion: number;
+    directoryQuery: { url: string; page: DirectoryPage } | null;
     req: Resource | null;
     oldReq: Resource | null;
     reload: boolean;
@@ -11,6 +13,8 @@ export const useFileStore = defineStore("file", {
     isFiles: boolean;
     preselect: string | null;
   } => ({
+    requestVersion: 0,
+    directoryQuery: null,
     req: null,
     oldReq: null,
     reload: false,
@@ -40,8 +44,21 @@ export const useFileStore = defineStore("file", {
     },
     updateRequest(value: Resource | null) {
       const selectedItems = this.selected.map((i) => this.req?.items[i]);
+      if (value?.page && this.req?.path === value.path) {
+        const hidden = selectedItems
+          .filter(
+            (item): item is ResourceItem =>
+              !!item && !value.items.some((i) => i.url === item.url)
+          )
+          .map((i) => ({ ...i, pageVisible: false }));
+        value.items.push(...hidden);
+        value.items.forEach((item, index) => (item.index = index));
+      }
       this.oldReq = this.req;
       this.req = value;
+      if (value?.page)
+        this.directoryQuery = { url: value.url, page: { ...value.page } };
+      else if (!value) this.directoryQuery = null;
 
       this.selected = [];
 
@@ -51,6 +68,10 @@ export const useFileStore = defineStore("file", {
           selectedItems.some((rItem) => rItem?.url === item.url)
         )
         .map((item) => item.index);
+    },
+    clearSelection() {
+      this.selected = [];
+      this.preselect = null;
     },
     removeSelected(value: any) {
       const i = this.selected.indexOf(value);

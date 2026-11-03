@@ -13,13 +13,13 @@ jobs:
     name: Lint Frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
         with:
           package_json_file: "frontend/package.json"
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: "24.x"
+          node-version-file: ".node-version"
           cache: "pnpm"
           cache-dependency-path: "frontend/pnpm-lock.yaml"
       - working-directory: frontend
@@ -31,100 +31,120 @@ jobs:
     name: Test Frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
         with:
           package_json_file: "frontend/package.json"
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: "24.x"
+          node-version-file: ".node-version"
           cache: "pnpm"
           cache-dependency-path: "frontend/pnpm-lock.yaml"
       - working-directory: frontend
         run: |
           pnpm install --frozen-lockfile
           pnpm run test
+          pnpm exec playwright install --with-deps chromium
+          pnpm run test:browser
+          pnpm audit --audit-level=low
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: "3.15.0"
+          cache: pip
+          cache-dependency-path: www/requirements.txt
+      - run: python -m pip install --require-hashes -r www/requirements.txt
+      - run: python -m mkdocs build --strict --config-file www/mkdocs.yml
 
   lint-backend:
     name: Lint Backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.0.0
         with:
-          go-version: "1.26.x"
-      - uses: golangci/golangci-lint-action@v9
+          go-version: "1.27.3"
+      - uses: golangci/golangci-lint-action@v9.3.0
         with:
-          version: "latest"
+          version: "v2.15.0"
 
   test:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.0.0
         with:
-          go-version: "1.26.x"
+          go-version: "1.27.3"
       - run: go test --race ./...
 
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7.0.0
         with:
-          go-version: '1.26'
-      - uses: pnpm/action-setup@v6
+          go-version: "1.27.3"
+      - uses: pnpm/action-setup@v6.1.0
         with:
           package_json_file: "frontend/package.json"
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: "24.x"
+          node-version-file: ".node-version"
           cache: "pnpm"
           cache-dependency-path: "frontend/pnpm-lock.yaml"
       - name: Install Task
-        uses: go-task/setup-task@v2
+        uses: go-task/setup-task@v2.2.0
+        with:
+          version: "3.54.0"
       - run: task build
 
   release:
     name: Release
-    needs: ["lint-frontend", "lint-backend", "test", "build"]
+    needs: ["lint-frontend", "test-frontend", "lint-backend", "test", "build", "docs"]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7.0.0
         with:
-          go-version: '1.26'
-      - uses: pnpm/action-setup@v6
+          go-version: "1.27.3"
+      - uses: pnpm/action-setup@v6.1.0
         with:
           package_json_file: "frontend/package.json"
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: "24.x"
+          node-version-file: ".node-version"
           cache: "pnpm"
           cache-dependency-path: "frontend/pnpm-lock.yaml"
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@v4.4.0
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v4.4.1
       - name: Install Task
-        uses: go-task/setup-task@v2
+        uses: go-task/setup-task@v2.2.0
+        with:
+          version: "3.54.0"
       - run: task build:frontend
       - name: Login to Docker Hub
-        uses: docker/login-action@v4
+        uses: docker/login-action@v4.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v7
+        uses: goreleaser/goreleaser-action@v7.3.0
         with:
-          version: latest
+          version: "v2.19.0"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}

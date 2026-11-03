@@ -1,4 +1,4 @@
-FROM ghcr.io/linuxserver/baseimage-alpine:3.23
+FROM ghcr.io/linuxserver/baseimage-alpine:3.24@sha256:d07ad0eb9e65feb40ded2125e17ad8e1b33228b3cf480567378c8042ef0a8b2d
 
 RUN apk update && \
   apk --no-cache add ca-certificates mailcap jq libcap
@@ -13,6 +13,7 @@ COPY docker/common/ /
 COPY docker/s6/ /
 
 RUN chown -R abc:abc /bin/filebrowser /defaults healthcheck.sh && \
+  chmod +x /healthcheck.sh /etc/services.d/filebrowser/run /custom-cont-init.d/20-config && \
   setcap 'cap_net_bind_service=+ep' /bin/filebrowser
 
 # Define healthcheck script

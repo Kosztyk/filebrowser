@@ -27,13 +27,17 @@ func TestTusPatchEnforcesUploadLength(t *testing.T) {
 	st := scopedUserStorage(t, userScope, perm, key)
 	signed := signToken(t, perm, key)
 
-	cache := newMemoryUploadCache()
-	t.Cleanup(cache.Close)
-	post := handle(tusPostHandler(cache), "", st, &settings.Server{})
-	patch := handle(tusPatchHandler(cache), "", st, &settings.Server{})
+	manager, err := NewUploadManager(filepath.Join(t.TempDir(), "uploads.db"), st, &settings.Server{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(manager.Close)
+	var uploadPath string
+	post := handle(tusPostHandler(manager), "", st, &settings.Server{})
+	patch := handle(tusPatchHandler(manager), "", st, &settings.Server{})
 
 	patchReq := func(body string) *httptest.ResponseRecorder {
-		req, _ := http.NewRequest(http.MethodPatch, "/file.txt", strings.NewReader(body))
+		req, _ := http.NewRequest(http.MethodPatch, uploadPath, strings.NewReader(body))
 		req.Header.Set("X-Auth", signed)
 		req.Header.Set("Content-Type", "application/offset+octet-stream")
 		req.Header.Set("Upload-Offset", "0")
@@ -52,21 +56,21 @@ func TestTusPatchEnforcesUploadLength(t *testing.T) {
 		t.Fatalf("POST expected 201, got %d body=%q", recPost.Code, recPost.Body.String())
 	}
 
+	uploadPath = "/" + filepath.Base(recPost.Header().Get("Location"))
 	// A body far larger than the declared length must be rejected, and nothing
 	// beyond the declared length may reach disk.
 	if rec := patchReq(strings.Repeat("A", 5000)); rec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("over-length PATCH expected 413, got %d body=%q", rec.Code, rec.Body.String())
 	}
-	if fi, err := os.Stat(filepath.Join(userScope, "file.txt")); err != nil {
-		t.Fatalf("stat file.txt: %v", err)
-	} else if fi.Size() > 5 {
-		t.Fatalf("wrote %d bytes despite Upload-Length 5", fi.Size())
+	if _, err := os.Stat(filepath.Join(userScope, "file.txt")); !os.IsNotExist(err) {
+		t.Fatal("unpublished destination exists", err)
 	}
 
 	// A correctly-sized upload still completes.
 	if rec := patchReq("hello"); rec.Code != http.StatusNoContent {
 		t.Fatalf("valid PATCH expected 204, got %d body=%q", rec.Code, rec.Body.String())
 	}
+	manager.processOne()
 	if data, _ := os.ReadFile(filepath.Join(userScope, "file.txt")); string(data) != "hello" {
 		t.Fatalf("expected file content \"hello\", got %q", string(data))
 	}

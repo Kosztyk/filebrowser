@@ -154,6 +154,68 @@
             </p>
           </div>
 
+          <p class="small">
+            Unfinished uploads survive server restarts. Reselect the same
+            original file after a browser restart. Space checks use each
+            destination filesystem.
+          </p>
+          <p>
+            <label for="upload-concurrency">Parallel browser uploads</label
+            ><input
+              id="upload-concurrency"
+              class="input input--block"
+              type="number"
+              min="1"
+              max="32"
+              v-model.number="settings.tus.concurrentUploads"
+            />
+          </p>
+          <p>
+            <label for="upload-retention"
+              >Upload recovery and history retention (hours)</label
+            ><input
+              id="upload-retention"
+              class="input input--block"
+              type="number"
+              min="1"
+              max="720"
+              v-model.number="settings.tus.retentionHours"
+            />
+          </p>
+          <p>
+            <label for="upload-max-active"
+              >Maximum unfinished uploads (all users)</label
+            ><input
+              id="upload-max-active"
+              class="input input--block"
+              type="number"
+              min="1"
+              max="10000"
+              v-model.number="settings.tus.maxActiveUploads"
+            />
+          </p>
+          <p>
+            <label for="upload-max-pending"
+              >Maximum total declared unfinished bytes (0 = unlimited)</label
+            ><input
+              id="upload-max-pending"
+              class="input input--block"
+              type="number"
+              min="0"
+              v-model.number="settings.tus.maxPendingBytes"
+            />
+          </p>
+          <p>
+            <label for="upload-reserve"
+              >Free space to keep on each destination filesystem (bytes)</label
+            ><input
+              id="upload-reserve"
+              class="input input--block"
+              type="number"
+              min="0"
+              v-model.number="settings.tus.reserveBytes"
+            />
+          </p>
           <h3>{{ t("settings.collabora") }}</h3>
 
           <p class="small">{{ t("settings.collaboraHelp") }}</p>
@@ -504,6 +566,52 @@
           </p>
 
           <p class="small">{{ t("settings.clamavScanDepthHelp") }}</p>
+          <p>
+            <label for="scan-max-bytes"
+              >Automatic scan limit (bytes; -1 = unlimited; 0 = default)</label
+            ><input
+              id="scan-max-bytes"
+              class="input input--block"
+              type="number"
+              min="-1"
+              v-model.number="settings.clamav.automaticMaxBytes"
+            />
+          </p>
+          <p>
+            <label for="scan-oversize">Files above the scan limit</label
+            ><select
+              id="scan-oversize"
+              class="input input--block"
+              v-model="settings.clamav.oversizePolicy"
+            >
+              <option value="skip">Publish with a skipped-scan warning</option>
+              <option value="scan">Send to scanner anyway</option>
+              <option value="block">
+                Keep unpublished until policy changes
+              </option>
+            </select>
+          </p>
+          <p>
+            <label for="scan-workers"
+              >Parallel upload processing workers (1–8)</label
+            ><input
+              id="scan-workers"
+              class="input input--block"
+              type="number"
+              min="1"
+              max="8"
+              v-model.number="settings.clamav.scanWorkers"
+            />
+          </p>
+          <p>
+            <label for="scan-timeout"
+              >Upload scan timeout (for example 30m)</label
+            ><input
+              id="scan-timeout"
+              class="input input--block"
+              v-model.trim="settings.clamav.scanTimeout"
+            />
+          </p>
 
           <p>
             <button
@@ -608,6 +716,11 @@
         </div>
       </form>
     </div>
+    <p>
+      <router-link to="/settings/system"
+        >Integration capabilities, last check and session controls</router-link
+      >
+    </p>
   </div>
 </template>
 
@@ -683,7 +796,6 @@ const applyChunkSize = () => {
   }
   pendingChunkSize.value = null;
 };
-
 
 // Define funcs
 const capitalize = (name: string, where: string | RegExp = "_") => {
@@ -820,6 +932,7 @@ const save = async () => {
   newSettings.convertx = normalizedConvertXSettings();
   newSettings.erugo = normalizedErugoSettings();
   newSettings.clamav = {
+    ...settings.value.clamav,
     enabled: Boolean(settings.value?.clamav?.enabled),
     url: settings.value?.clamav?.url?.trim() ?? "",
     scanDepth: Number(settings.value?.clamav?.scanDepth ?? 0),
@@ -912,6 +1025,7 @@ onMounted(async () => {
         tokenTTL: original.collabora?.tokenTTL || "2h",
       },
       convertx: {
+        ...original.convertx,
         configured: original.convertx?.configured ?? true,
         enabled: original.convertx?.enabled ?? false,
         url: original.convertx?.url ?? "",
@@ -932,7 +1046,20 @@ onMounted(async () => {
         timeout: original.erugo?.timeout || "2m",
         uploadTimeout: original.erugo?.uploadTimeout || "2h",
       },
+      tus: {
+        chunkSize: original.tus?.chunkSize ?? 10485760,
+        retryCount: original.tus?.retryCount ?? 5,
+        retentionHours: original.tus?.retentionHours ?? 72,
+        concurrentUploads: original.tus?.concurrentUploads ?? 5,
+        maxActiveUploads: original.tus?.maxActiveUploads ?? 1000,
+        maxPendingBytes: original.tus?.maxPendingBytes ?? 0,
+        reserveBytes: original.tus?.reserveBytes ?? 67108864,
+      },
       clamav: {
+        automaticMaxBytes: original.clamav?.automaticMaxBytes ?? 1900000000,
+        oversizePolicy: original.clamav?.oversizePolicy ?? "skip",
+        scanWorkers: original.clamav?.scanWorkers ?? 2,
+        scanTimeout: original.clamav?.scanTimeout ?? "30m",
         enabled: original.clamav?.enabled ?? false,
         url: original.clamav?.url ?? "",
         scanDepth: original.clamav?.scanDepth ?? 0,

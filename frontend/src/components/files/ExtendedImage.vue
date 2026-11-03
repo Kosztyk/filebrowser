@@ -10,12 +10,14 @@
     @mouseup="mouseUp"
     @wheel="wheelMove"
   >
+    <p v-if="decodeError" role="alert">{{ decodeError }}</p>
     <img class="image-ex-img image-ex-img-center" ref="imgex" @load="onLoad" />
   </div>
 </template>
 <script setup lang="ts">
 import { throttle } from "lodash-es";
-import UTIF from "utif";
+import { fetchURL } from "@/api/utils";
+import { baseURL } from "@/utils/constants";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 interface IProps {
@@ -25,6 +27,21 @@ interface IProps {
   zoomStep?: number;
 }
 
+const decodeError = ref("");
+let decoder: Worker | undefined;
+let imageURL = "";
+let decodeTimer: number | undefined;
+let imageAbort: AbortController | undefined;
+function cleanupDecoder() {
+  clearTimeout(decodeTimer);
+  decoder?.terminate();
+  decoder = undefined;
+  imageAbort?.abort();
+  if (imageURL) {
+    URL.revokeObjectURL(imageURL);
+    imageURL = "";
+  }
+}
 const props = withDefaults(defineProps<IProps>(), {
   moveDisabledTime: () => 200,
   classList: () => [],
@@ -82,6 +99,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  cleanupDecoder();
   window.removeEventListener("resize", onResize);
   document.removeEventListener("mouseup", onMouseUp);
 });
@@ -102,26 +120,104 @@ watch(
   }
 );
 
-// Modified from UTIF.replaceIMG
 const decodeUTIF = () => {
-  const sufs = ["tif", "tiff", "dng", "cr2", "nef"];
-  if (document?.location?.pathname === undefined) {
-    return;
-  }
-  const suff =
-    document.location.pathname.split(".")?.pop()?.toLowerCase() ?? "";
-
-  if (sufs.indexOf(suff) == -1) return false;
-  const xhr = new XMLHttpRequest();
-  UTIF._xhrs.push(xhr);
-  UTIF._imgs.push(imgex.value);
-  xhr.open("GET", props.src);
-  xhr.responseType = "arraybuffer";
-  xhr.onload = UTIF._imgLoaded;
-  xhr.send();
+  cleanupDecoder();
+  decodeError.value = "";
+  if (new URL(props.src, location.origin).pathname.includes("/api/preview/"))
+    return false;
+  const suffix = new URL(props.src, location.origin).pathname
+    .split(".")
+    .pop()
+    ?.toLowerCase();
+  if (!["tif", "tiff", "dng", "cr2", "nef"].includes(suffix || ""))
+    return false;
+  imageAbort = new AbortController();
+  const controller = imageAbort;
+  let timeout: number | undefined;
+  void (async () => {
+    try {
+      const target = new URL(props.src, location.origin);
+      if (target.origin !== location.origin)
+        throw new Error("Image preview must use application origin");
+      const apiURL = target.pathname + target.search;
+      const response = await fetchURL(
+        apiURL.startsWith(baseURL) ? apiURL.slice(baseURL.length) : apiURL,
+        { signal: controller.signal }
+      );
+      if (!response.body) throw new Error("Image has no content");
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let length = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        length += value.byteLength;
+        if (length > 32 * 1024 * 1024) {
+          await reader.cancel();
+          throw new Error(
+            "Image exceeds the 32 MiB preview limit. Download it to open locally."
+          );
+        }
+        chunks.push(value);
+      }
+      const bytes = new Uint8Array(length);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.length;
+      }
+      if (controller.signal.aborted) return;
+      decoder = new Worker(
+        new URL("../../workers/imageDecode.ts", import.meta.url),
+        { type: "module" }
+      );
+      const worker = decoder;
+      timeout = window.setTimeout(() => {
+        worker.terminate();
+        decodeError.value =
+          "Image decoding exceeded 15 seconds. Download it to open locally.";
+      }, 15000);
+      decodeTimer = timeout;
+      worker.onmessage = (event) => {
+        clearTimeout(timeout);
+        worker.terminate();
+        if (controller.signal.aborted) return;
+        if (event.data.error) {
+          decodeError.value = event.data.error;
+          return;
+        }
+        const { width, height, rgba } = event.data;
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          decodeError.value = "Canvas unavailable";
+          return;
+        }
+        context.putImageData(
+          new ImageData(new Uint8ClampedArray(rgba), width, height),
+          0,
+          0
+        );
+        canvas.toBlob((blob) => {
+          if (!blob || controller.signal.aborted) return;
+          imageURL = URL.createObjectURL(blob);
+          if (imgex.value) imgex.value.src = imageURL;
+        }, "image/png");
+      };
+      worker.onerror = () => {
+        clearTimeout(timeout);
+        worker.terminate();
+        decodeError.value = "Image decoding failed";
+      };
+      worker.postMessage(bytes.buffer, [bytes.buffer]);
+    } catch (e) {
+      if (!controller.signal.aborted) decodeError.value = String(e);
+    }
+  })();
   return true;
 };
-
 const onLoad = () => {
   imageLoaded.value = true;
 

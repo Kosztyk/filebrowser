@@ -215,34 +215,67 @@ import url from "@/utils/url";
 import { throttle } from "lodash-es";
 import HeaderBar from "@/components/header/HeaderBar.vue";
 import Action from "@/components/header/Action.vue";
-import ExtendedImage from "@/components/files/ExtendedImage.vue";
-import VideoPlayer from "@/components/files/VideoPlayer.vue";
-import CsvViewer from "@/components/files/CsvViewer.vue";
-import { VueReader } from "vue-reader";
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
+
+import {
+  defineAsyncComponent,
+  computed,
+  inject,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { Rendition } from "epubjs";
 import { getTheme } from "@/utils/theme";
 import { useI18n } from "vue-i18n";
 
+import {
+  bookStorageKey,
+  migrateBookPosition,
+  readBookPosition,
+} from "@/utils/bookStorage";
+const ExtendedImage = defineAsyncComponent(
+  () => import("@/components/files/ExtendedImage.vue")
+);
+const VideoPlayer = defineAsyncComponent(
+  () => import("@/components/files/MediaPlayer.vue")
+);
+const CsvViewer = defineAsyncComponent(
+  () => import("@/components/files/CsvViewer.vue")
+);
+const VueReader = defineAsyncComponent(() =>
+  import("vue-reader").then((m) => m.VueReader)
+);
 // CSV file size limit for preview (5MB)
 // Prevents browser memory issues with large files
 const CSV_MAX_SIZE = 5 * 1024 * 1024;
 
-const location = useStorage("book-progress", 0, undefined, {
-  serializer: {
-    read: (v) => JSON.parse(v),
-    write: (v) => JSON.stringify(v),
-  },
+const bookKey = computed(() =>
+  bookStorageKey(
+    useAuthStore().user?.id,
+    useFileStore().req?.url || window.location.pathname
+  )
+);
+watch(bookKey, (key) => migrateBookPosition(key), { immediate: true });
+const location = useStorage<string | number>(bookKey, 0, undefined, {
+  serializer: { read: readBookPosition, write: (v) => JSON.stringify(v) },
 });
-const size = useStorage("book-size", 120, undefined, {
-  serializer: {
-    read: (v) => JSON.parse(v),
-    write: (v) => JSON.stringify(v),
-  },
-});
-
-const locationChange = (epubcifi: number) => {
+const size = useStorage(
+  computed(() => bookKey.value + ":font-size"),
+  120,
+  undefined,
+  {
+    serializer: {
+      read: (v) => {
+        const n = Number(v);
+        return Number.isFinite(n) && n >= 50 && n <= 300 ? n : 120;
+      },
+      write: (v) => String(v),
+    },
+  }
+);
+const locationChange = (epubcifi: string) => {
   location.value = epubcifi;
 };
 let rendition: Rendition | null = null;
@@ -318,8 +351,8 @@ const directUrl = computed(() =>
 const canExtractArchiveFile = computed(() =>
   Boolean(
     fileStore.req?.archivePath &&
-      fileStore.req?.archiveInnerPath &&
-      authStore.user?.perm.create
+    fileStore.req?.archiveInnerPath &&
+    authStore.user?.perm.create
   )
 );
 
@@ -450,8 +483,12 @@ const updatePreview = async () => {
   }
 
   if (fileStore.req?.archiveInnerPath) {
-    const innerParts = fileStore.req.archiveInnerPath.split("/").filter(Boolean);
-    name.value = decodeURIComponent(innerParts[innerParts.length - 1] || fileStore.req.name);
+    const innerParts = fileStore.req.archiveInnerPath
+      .split("/")
+      .filter(Boolean);
+    name.value = decodeURIComponent(
+      innerParts[innerParts.length - 1] || fileStore.req.name
+    );
   } else {
     const dirs = route.fullPath.split("/");
     name.value = decodeURIComponent(dirs[dirs.length - 1]);
@@ -476,9 +513,13 @@ const updatePreview = async () => {
   if (!listing.value) {
     try {
       const archiveInner = fileStore.req?.archiveInnerPath;
-      const res = fileStore.req?.archivePath && archiveInner
-        ? await api.fetchArchive(fileStore.req.archivePath, archiveParentPath(archiveInner))
-        : await api.fetch(url.removeLastDir(route.path));
+      const res =
+        fileStore.req?.archivePath && archiveInner
+          ? await api.fetchArchive(
+              fileStore.req.archivePath,
+              archiveParentPath(archiveInner)
+            )
+          : await api.fetch(url.removeLastDir(route.path));
       listing.value = res.items;
     } catch (e: any) {
       $showError(e);

@@ -20,11 +20,12 @@
       />
     </main>
     <prompts></prompts>
-    <upload-files></upload-files>
+    <upload-files></upload-files><BackgroundJobs />
   </div>
 </template>
 
 <script setup lang="ts">
+import BackgroundJobs from "@/components/BackgroundJobs.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useLayoutStore } from "@/stores/layout";
 import { useFileStore } from "@/stores/file";
@@ -59,7 +60,6 @@ watch(route, () => {
   }
 });
 </script>
-
 
 <style scoped>
 main.office-fullscreen-main {

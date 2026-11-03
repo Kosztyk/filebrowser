@@ -1,0 +1,2 @@
+{"upload_bytes": 67108987, "download_bytes": 67108987, "forced_restart_recovery": true, "range": "pass", "private_staging": "pass", "scan_state": "disabled", "sha256": "66614255e4fde144fcac6a3847fa4480d6010caf71f55da82978d1c3fe3482c6", "backend_processes_peak_rss_kib": 27184, "elapsed_seconds": 1.46}
+{"production_browser":"pass","pause_resume":"pass","reload_reselect_resume":"pass","reserved_filename":"pass","cancel":"pass","clear_history_preserves_files":"pass","page_errors":[]}

@@ -30,6 +30,9 @@
               {{ t("settings.userManagement") }}
             </li></router-link
           >
+          <router-link to="/settings/system"
+            ><li>About / System</li></router-link
+          >
         </ul>
       </div>
     </div>

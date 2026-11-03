@@ -1,3 +1,5 @@
+> **Current fork documentation:** For File Browser **3.3.1**, use [README](README.md) and [installation/upgrade](docs/INSTALL_3.3.1.md), plus [integrations](docs/INTEGRATIONS_3.3.1.md). Material below is retained as historical/underlying reference and may describe earlier versions.
+
 # Erugo bandwidth limits from File Browser
 
 This build extends the existing optional Erugo integration without changing File Browser's native sharing model.

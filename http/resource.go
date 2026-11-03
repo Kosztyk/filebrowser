@@ -23,6 +23,12 @@ import (
 )
 
 var resourceGetHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
+	if d.features != nil && r.URL.Query().Get("paged") == "true" {
+		status, err := d.features.directoryPage(w, r, d)
+		if status != -1 {
+			return status, err
+		}
+	}
 	file, err := files.NewFileInfo(&files.FileOptions{
 		Fs:         d.user.Fs,
 		Path:       r.URL.Path,
@@ -30,7 +36,7 @@ var resourceGetHandler = withUser(func(w http.ResponseWriter, r *http.Request, d
 		Expand:     true,
 		ReadHeader: d.server.TypeDetectionByHeader,
 		Checker:    d,
-		Content:    d.user.Perm.Download,
+		Content:    d.user.Perm.Download && r.URL.Query().Get("paged") != "true",
 	})
 	if err != nil {
 		return errToStatus(err), err
@@ -119,7 +125,7 @@ func resourceDeleteHandler(fileCache FileCache) handleFunc {
 		}
 
 		err = d.RunHook(func() error {
-			return d.user.Fs.RemoveAll(r.URL.Path)
+			return files.GuardMutation(d.user.Fs, []string{r.URL.Path}, func() error { return d.user.Fs.RemoveAll(r.URL.Path) })
 		}, "delete", r.URL.Path, "", d.user)
 
 		if err != nil {
@@ -168,24 +174,18 @@ func resourcePostHandler(fileCache FileCache) handleFunc {
 			}
 		}
 
-		err = d.RunHook(func() error {
-			info, writeErr := writeFile(d.user.Fs, r.URL.Path, r.Body, d.settings.FileMode, d.settings.DirMode)
+		err = runPublicationHook(d, "upload", r.URL.Path, func() error {
+			info, scan, writeErr := writeScannedFile(r.Context(), d.user.Fs, r.URL.Path, r.Body, d.settings.ClamAV, d.settings.FileMode, d.settings.DirMode)
 			if writeErr != nil {
 				return writeErr
 			}
 
-			if scanErr := scanUploadedFile(r.Context(), d.user.Fs, r.URL.Path, d.settings.ClamAV); scanErr != nil {
-				return scanErr
-			}
+			w.Header().Set("Upload-Scan-State", scan.Status)
 
 			etag := fmt.Sprintf(`"%x%x"`, info.ModTime().UnixNano(), info.Size())
 			w.Header().Set("ETag", etag)
 			return nil
-		}, "upload", r.URL.Path, "", d.user)
-
-		if err != nil {
-			_ = d.user.Fs.RemoveAll(r.URL.Path)
-		}
+		})
 
 		return clamAVHTTPStatus(err), err
 	})
@@ -209,7 +209,7 @@ var resourcePutHandler = withUser(func(w http.ResponseWriter, r *http.Request, d
 		return http.StatusNotFound, nil
 	}
 
-	err = d.RunHook(func() error {
+	err = runPublicationHook(d, "save", r.URL.Path, func() error {
 		info, writeErr := writeFile(d.user.Fs, r.URL.Path, r.Body, d.settings.FileMode, d.settings.DirMode)
 		if writeErr != nil {
 			return writeErr
@@ -218,7 +218,7 @@ var resourcePutHandler = withUser(func(w http.ResponseWriter, r *http.Request, d
 		etag := fmt.Sprintf(`"%x%x"`, info.ModTime().UnixNano(), info.Size())
 		w.Header().Set("ETag", etag)
 		return nil
-	}, "save", r.URL.Path, "", d.user)
+	})
 
 	return errToStatus(err), err
 })
@@ -271,6 +271,14 @@ func resourcePatchHandler(fileCache FileCache) handleFunc {
 			return errToStatus(err), err
 		}
 
+		if err = files.CheckMutation(d.user.Fs, dst); err != nil {
+			return errToStatus(err), err
+		}
+		if action == "rename" {
+			if err = files.CheckMutation(d.user.Fs, src); err != nil {
+				return errToStatus(err), err
+			}
+		}
 		err = d.RunHook(func() error {
 			return patchAction(r.Context(), action, src, dst, d, fileCache)
 		}, action, src, dst, d.user)
@@ -348,36 +356,7 @@ func addVersionSuffix(source string, afs afero.Fs) string {
 }
 
 func writeFile(afs afero.Fs, dst string, in io.Reader, fileMode, dirMode fs.FileMode) (os.FileInfo, error) {
-	dir, _ := path.Split(dst)
-	err := afs.MkdirAll(dir, dirMode)
-	if err != nil {
-		return nil, err
-	}
-
-	file, err := afs.OpenFile(dst, os.O_RDWR|os.O_CREATE|os.O_TRUNC, fileMode)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	_, err = io.Copy(file, in)
-	if err != nil {
-		return nil, err
-	}
-
-	// Sync the file to ensure all data is written to storage.
-	// to prevent file corruption.
-	if err := file.Sync(); err != nil {
-		return nil, err
-	}
-
-	// Gets the info about the file.
-	info, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	return info, nil
+	return files.AtomicWrite(afs, dst, in, fileMode, dirMode)
 }
 
 func delThumbs(ctx context.Context, fileCache FileCache, file *files.FileInfo) error {

@@ -1,0 +1,4 @@
+$ pnpm run typecheck:vue && pnpm run typecheck:native && pnpm run typecheck:config
+$ vue-tsc -p ./tsconfig.app.json --noEmit
+$ tsc -p ./tsconfig.native.json --noEmit
+$ tsc -p ./tsconfig.node.json --noEmit

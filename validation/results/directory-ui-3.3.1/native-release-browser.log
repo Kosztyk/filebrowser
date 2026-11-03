@@ -1,0 +1,11 @@
+PASS bounded pages, cross-page selection, clear selection, return to the previous page and lazy EPUB loading
+PASS original folder/file sections, cards, immediate sorting, live filtering and clear filter
+PASS right-click actions, rename, internal drag/move and native file drop into a folder
+PASS gallery/list/mosaic modes, immediate column sorting, keyboard sorting and mobile layout
+PASS bounded CSV paging and metadata-only loading
+PASS bounded log window
+PASS TIFF decoded in a worker
+PASS previous contents API
+PASS durable prepared ZIP, range download and ETag
+PASS About/System, sessions, diagnostics and limits UI
+PASS no browser runtime errors

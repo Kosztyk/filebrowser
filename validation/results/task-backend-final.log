@@ -1,0 +1,1 @@
+task: [build:backend] go build -buildvcs=false -ldflags='-s -w -X "github.com/filebrowser/filebrowser/v2/version.Version=3.1.0" -X "github.com/filebrowser/filebrowser/v2/version.CommitSHA=cc1a3a8"' -o filebrowser .

@@ -74,7 +74,41 @@
     "downloadSelected": "Download Selected"
   },
   "upload": {
-    "abortUpload": "Are you sure you wish to abort?"
+    "abortUpload": "Are you sure you wish to abort?",
+    "transfers": "Transfers",
+    "transferred": "transferred",
+    "clearCompleted": "Clear completed history",
+    "cancelUnfinished": "Cancel unfinished uploads",
+    "toggleList": "Show or hide transfers",
+    "pause": "Pause",
+    "resume": "Resume",
+    "selectOriginal": "Select original file",
+    "retryProcessing": "Retry processing",
+    "cancel": "Cancel",
+    "states": {
+      "queued": "Queued",
+      "uploading": "Uploading",
+      "pausing": "Pausing",
+      "paused": "Paused",
+      "needs_file": "Select original file to resume",
+      "received": "Received; waiting for processing",
+      "scanning": "Scanning",
+      "committing": "Publishing",
+      "ready": "Ready",
+      "failed": "Failed",
+      "infected": "Blocked: infected",
+      "cancelled": "Cancelled",
+      "expired": "Expired"
+    },
+    "scan": {
+      "pending": "Scan pending",
+      "clean": "Scan: clean",
+      "disabled": "Scanning disabled",
+      "skipped": "Scan skipped by size policy",
+      "infected": "Scan: infected",
+      "unknown": "Scan result unknown",
+      "error": "Scan failed"
+    }
   },
   "errors": {
     "forbidden": "You don't have permissions to access this.",
@@ -113,7 +147,25 @@
     "convertNoTargets": "ConvertX does not expose any output format for this file type.",
     "converted": "Converted file saved to {destination}",
     "scanClean": "Security scan completed. No malware was found in {count} file(s).",
-    "scanCleanMultiple": "Security scan completed. No malware was found in {count} file(s)."
+    "scanCleanMultiple": "Security scan completed. No malware was found in {count} file(s).",
+    "filterNames": "Filter names",
+    "filterPlaceholder": "Filter this folder…",
+    "clearFilter": "Clear filter",
+    "sortOrder": "Sort order",
+    "sortNameAZ": "Name (A–Z)",
+    "sortNameZA": "Name (Z–A)",
+    "sortSizeSmall": "Size (smallest first)",
+    "sortSizeLarge": "Size (largest first)",
+    "sortNewest": "Modified (newest first)",
+    "sortOldest": "Modified (oldest first)",
+    "refreshListing": "Refresh listing",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "of": "of",
+    "directoryItemCount": "{count} items | {count} item | {count} items",
+    "directorySelected": "{count} selected",
+    "clearSelection": "Clear selection",
+    "directorySelectedAcrossPages": "{count} selected across pages"
   },
   "help": {
     "click": "select file or directory",

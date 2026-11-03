@@ -1,6 +1,7 @@
 package fbhttp
 
 import (
+	"github.com/filebrowser/filebrowser/v2/files"
 	"log"
 	"net/http"
 	gopath "path"
@@ -18,6 +19,9 @@ import (
 type handleFunc func(w http.ResponseWriter, r *http.Request, d *data) (int, error)
 
 type data struct {
+	features    *featureRuntime
+	sessionID   string
+	idempotency string
 	*runner.Runner
 	settings *settings.Settings
 	server   *settings.Server
@@ -46,6 +50,10 @@ func (d *data) Check(path string) bool {
 // Check, it ignores HideDotfiles: hiding dotfiles is a display preference, so
 // it must not stop a user from operating on a tree that contains one.
 func (d *data) CheckRules(path string) bool {
+	if files.IsPrivatePath(path) {
+		return false
+	}
+
 	path = d.rulePath(path)
 
 	allow := true
@@ -84,7 +92,7 @@ func (d *data) rulePath(path string) string {
 	return path
 }
 
-func handle(fn handleFunc, prefix string, store *storage.Storage, server *settings.Server) http.Handler {
+func handle(fn handleFunc, prefix string, store *storage.Storage, server *settings.Server, runtime ...*featureRuntime) http.Handler {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		for k, v := range globalHeaders {
 			w.Header().Set(k, v)
@@ -96,7 +104,12 @@ func handle(fn handleFunc, prefix string, store *storage.Storage, server *settin
 			return
 		}
 
+		var features *featureRuntime
+		if len(runtime) > 0 {
+			features = runtime[0]
+		}
 		status, err := fn(w, r, &data{
+			features: features,
 			Runner:   &runner.Runner{Enabled: server.EnableExec, Settings: settings},
 			store:    store,
 			settings: settings,

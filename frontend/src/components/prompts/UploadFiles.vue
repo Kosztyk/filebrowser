@@ -1,222 +1,257 @@
 <template>
   <div
-    v-if="uploadStore.activeUploads.size > 0"
+    v-if="store.allUploads.length"
     class="upload-files"
-    v-bind:class="{ closed: !open }"
+    :class="{ closed: !open }"
   >
     <div class="card floating">
       <div class="card-title">
-        <h2>
-          {{
-            $t("prompts.uploadFiles", {
-              files: uploadStore.pendingUploadCount,
-            })
-          }}
-        </h2>
-        <div class="upload-info">
-          <div class="upload-speed">{{ speedText }}/s</div>
-          <div class="upload-eta">{{ formattedETA }} remaining</div>
-          <div class="upload-percentage">{{ sentPercent }}% Completed</div>
-          <div class="upload-fraction">
-            {{ sentMbytes }} /
-            {{ totalMbytes }}
-          </div>
-        </div>
-        <button
+        <h2>{{ t("upload.transfers") }} ({{ store.allUploads.length }})</h2>
+        <span v-if="store.totalBytes"
+          >{{ percentTotal }}% {{ t("upload.transferred") }} ·
+          {{ filesize(Math.max(0, speed)) }}/s · {{ eta }}</span
+        ><button
+          class="action"
+          @click="store.clearCompleted"
+          :aria-label="t('upload.clearCompleted')"
+          :title="t('upload.clearCompleted')"
+        >
+          <i class="material-icons">clear_all</i></button
+        ><button
           class="action"
           @click="abortAll"
-          aria-label="Abort upload"
-          title="Abort upload"
+          :aria-label="t('upload.cancelUnfinished')"
+          :title="t('upload.cancelUnfinished')"
         >
-          <i class="material-icons">{{ "cancel" }}</i>
-        </button>
-        <button
+          <i class="material-icons">cancel</i></button
+        ><button
           class="action"
-          @click="toggle"
-          aria-label="Toggle file upload list"
-          title="Toggle file upload list"
+          @click="open = !open"
+          :aria-label="t('upload.toggleList')"
         >
           <i class="material-icons">{{
             open ? "keyboard_arrow_down" : "keyboard_arrow_up"
           }}</i>
         </button>
       </div>
-
-      <div class="card-content file-icons">
+      <div v-show="open" class="card-content transfer-list">
         <div
-          class="file"
-          v-for="upload in uploadStore.activeUploads"
-          :key="upload.path"
-          :data-dir="upload.type === 'dir'"
-          :data-type="upload.type"
-          :aria-label="upload.name"
+          v-for="item in store.allUploads"
+          :key="item.id"
+          class="transfer-row"
+          :data-status="item.status"
         >
-          <div class="file-name">
-            <i class="material-icons"></i> {{ upload.name }}
+          <div class="transfer-title">
+            <span class="transfer-name" :title="item.path">{{ item.name }}</span
+            ><span>{{ t("upload.states." + item.status) }}</span>
           </div>
-          <div class="file-progress">
-            <div
-              v-bind:style="{
-                width: (upload.sentBytes / upload.totalBytes) * 100 + '%',
+          <div
+            class="transfer-progress"
+            role="progressbar"
+            :aria-label="item.name"
+            :aria-valuenow="percent(item)"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <div :style="{ width: percent(item) + '%' }"></div>
+          </div>
+          <div class="transfer-detail">
+            <span
+              >{{ filesize(Math.max(0, item.sentBytes)) }} /
+              {{ filesize(item.totalBytes) }}</span
+            ><span
+              v-if="item.scan"
+              :class="{
+                'scan-warning': [
+                  'skipped',
+                  'disabled',
+                  'unknown',
+                  'error',
+                  'infected',
+                ].includes(item.scan.status),
               }"
-            ></div>
+              >{{ t("upload.scan." + item.scan.status) }}</span
+            >
+          </div>
+          <p v-if="item.message" class="transfer-message">{{ item.message }}</p>
+          <div class="transfer-actions">
+            <button
+              v-if="item.status === 'uploading'"
+              class="button button--flat"
+              @click="store.pause(item)"
+            >
+              {{ t("upload.pause") }}</button
+            ><button
+              v-if="canResume(item) && item.file"
+              class="button button--flat"
+              @click="store.resume(item)"
+            >
+              {{ t("upload.resume") }}</button
+            ><label
+              v-if="canResume(item) && !item.file"
+              class="button button--flat select-original"
+              >{{ t("upload.selectOriginal")
+              }}<input
+                type="file"
+                @change="selectOriginal(item, $event)"
+                :aria-label="t('upload.selectOriginal')" /></label
+            ><button
+              v-if="item.status === 'failed' && item.canRetry"
+              class="button button--flat"
+              @click="store.retry(item)"
+            >
+              {{ t("upload.retryProcessing") }}</button
+            ><button
+              v-if="!['ready', 'cancelled', 'expired'].includes(item.status)"
+              class="button button--flat"
+              @click="store.cancel(item)"
+            >
+              {{ t("upload.cancel") }}
+            </button>
           </div>
         </div>
       </div>
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
-import { useFileStore } from "@/stores/file";
 import { useUploadStore } from "@/stores/upload";
-import { storeToRefs } from "pinia";
-import { computed, ref, watch } from "vue";
-import buttons from "@/utils/buttons";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { partial } from "filesize";
-
-const { t } = useI18n({});
-
-const open = ref<boolean>(false);
-const speed = ref<number>(0);
-const eta = ref<number>(Infinity);
-
-const fileStore = useFileStore();
-const uploadStore = useUploadStore();
-
-const { sentBytes, totalBytes } = storeToRefs(uploadStore);
-
-const byteToMbyte = partial({ exponent: 2 });
-const byteToKbyte = partial({ exponent: 1 });
-
-const sentPercent = computed(() =>
-  ((uploadStore.sentBytes / uploadStore.totalBytes) * 100).toFixed(2)
+import { filesize } from "filesize";
+const { t } = useI18n(),
+  store = useUploadStore(),
+  open = ref(true);
+onMounted(() => store.start());
+const speed = ref(0);
+let previousTime = Date.now(),
+  previousBytes = 0;
+watch(
+  () => store.sentBytes,
+  (bytes) => {
+    const now = Date.now(),
+      seconds = (now - previousTime) / 1000;
+    speed.value =
+      seconds > 0 && bytes >= previousBytes
+        ? (bytes - previousBytes) / seconds
+        : 0;
+    previousBytes = bytes;
+    previousTime = now;
+  }
 );
-
-const sentMbytes = computed(() => byteToMbyte(uploadStore.sentBytes));
-const totalMbytes = computed(() => byteToMbyte(uploadStore.totalBytes));
-const speedText = computed(() => {
-  const bytes = speed.value;
-
-  if (bytes < 1024 * 1024) {
-    const kb = parseFloat(byteToKbyte(bytes));
-    return `${kb.toFixed(2)} KB`;
-  } else {
-    const mb = parseFloat(byteToMbyte(bytes));
-    return `${mb.toFixed(2)} MB`;
-  }
-});
-
-let lastSpeedUpdate: number = 0;
-let recentSpeeds: number[] = [];
-
-let lastThrottleTime = 0;
-
-const throttledCalculateSpeed = (sentBytes: number, oldSentBytes: number) => {
-  const now = Date.now();
-  if (now - lastThrottleTime < 100) {
-    return;
-  }
-
-  lastThrottleTime = now;
-  calculateSpeed(sentBytes, oldSentBytes);
-};
-
-const calculateSpeed = (sentBytes: number, oldSentBytes: number) => {
-  // Reset the state when the uploads batch is complete
-  if (sentBytes === 0) {
-    lastSpeedUpdate = 0;
-    recentSpeeds = [];
-
-    eta.value = Infinity;
+watch(
+  () => store.totalBytes,
+  () => {
     speed.value = 0;
-
-    return;
+    previousBytes = store.sentBytes;
+    previousTime = Date.now();
   }
-
-  const elapsedTime = (Date.now() - (lastSpeedUpdate ?? 0)) / 1000;
-  const bytesSinceLastUpdate = sentBytes - oldSentBytes;
-  const currentSpeed = bytesSinceLastUpdate / elapsedTime;
-
-  recentSpeeds.push(currentSpeed);
-  if (recentSpeeds.length > 5) {
-    recentSpeeds.shift();
-  }
-
-  const recentSpeedsAverage =
-    recentSpeeds.reduce((acc, curr) => acc + curr) / recentSpeeds.length;
-
-  // Use the current speed for the first update to avoid smoothing lag
-  if (recentSpeeds.length === 1) {
-    speed.value = currentSpeed;
-  }
-
-  speed.value = recentSpeedsAverage * 0.2 + speed.value * 0.8;
-
-  lastSpeedUpdate = Date.now();
-
-  calculateEta();
-};
-
-const calculateEta = () => {
-  if (speed.value === 0) {
-    eta.value = Infinity;
-
-    return Infinity;
-  }
-
-  const remainingSize = uploadStore.totalBytes - uploadStore.sentBytes;
-  const speedBytesPerSecond = speed.value;
-
-  eta.value = remainingSize / speedBytesPerSecond;
-};
-
-watch(sentBytes, throttledCalculateSpeed);
-
-watch(totalBytes, (totalBytes, oldTotalBytes) => {
-  if (oldTotalBytes !== 0) {
-    return;
-  }
-
-  // Mark the start time of a new upload batch
-  lastSpeedUpdate = Date.now();
+);
+const eta = computed(() => {
+  const n = Math.ceil((store.totalBytes - store.sentBytes) / speed.value);
+  return !Number.isFinite(n) || n <= 0
+    ? "--:--:--"
+    : [Math.floor(n / 3600), Math.floor(n / 60) % 60, n % 60]
+        .map((v) => String(v).padStart(2, "0"))
+        .join(":");
 });
-
-const formattedETA = computed(() => {
-  if (!eta.value || eta.value === Infinity) {
-    return "--:--:--";
+const percentTotal = computed(() =>
+  Math.min(
+    100,
+    (store.sentBytes / Math.max(1, store.totalBytes)) * 100
+  ).toFixed(1)
+);
+function percent(i: Upload) {
+  return i.totalBytes
+    ? Math.min(100, Math.max(0, (i.sentBytes / i.totalBytes) * 100))
+    : i.status === "ready"
+      ? 100
+      : 0;
+}
+function canResume(i: Upload) {
+  return (
+    ["paused", "needs_file"].includes(i.status) ||
+    (i.status === "failed" && i.canRetry === undefined)
+  );
+}
+function selectOriginal(i: Upload, e: Event) {
+  const input = e.target as HTMLInputElement,
+    file = input.files?.[0];
+  if (file) {
+    try {
+      store.selectFile(i, file);
+    } catch (error) {
+      i.message = String(error);
+    }
   }
-
-  let totalSeconds = eta.value;
-  const hours = Math.floor(totalSeconds / 3600);
-  totalSeconds %= 3600;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.round(totalSeconds % 60);
-
-  return `${hours.toString().padStart(2, "0")}:${minutes
-    .toString()
-    .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-});
-
-const toggle = () => {
-  open.value = !open.value;
-};
-
-const abortAll = () => {
-  if (confirm(t("upload.abortUpload"))) {
-    buttons.done("upload");
-    open.value = false;
-    uploadStore.abort();
-    fileStore.reload = true; // Trigger reload in the file store
-  }
-};
+  input.value = "";
+}
+function abortAll() {
+  if (confirm(t("upload.abortUpload"))) void store.abort();
+}
 </script>
-
 <style scoped>
-.upload-info {
-  min-width: 19ch;
-  width: auto;
-  text-align: left;
+.transfer-list {
+  max-height: 55vh;
+  overflow: auto;
+}
+.transfer-row {
+  padding: 0.75em 0;
+  border-bottom: 1px solid var(--divider);
+}
+.transfer-title,
+.transfer-detail {
+  display: flex;
+  justify-content: space-between;
+  gap: 1em;
+}
+.transfer-title {
+  font-weight: 600;
+}
+.transfer-name {
+  max-width: 65%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.transfer-progress {
+  height: 5px;
+  background: rgba(128, 128, 128, 0.25);
+  margin: 0.5em 0;
+}
+.transfer-progress > div {
+  height: 100%;
+  background: #40c4ff;
+  transition: width 0.2s;
+}
+.transfer-detail,
+.transfer-message {
+  font-size: 0.85em;
+}
+.transfer-message {
+  overflow-wrap: anywhere;
+}
+.transfer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25em;
+}
+.transfer-actions .button {
+  margin: 0;
+  padding: 0.4em 0.7em;
+}
+.scan-warning {
+  color: var(--red);
+}
+.select-original {
+  position: relative;
+  overflow: hidden;
+}
+.select-original input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
 }
 </style>

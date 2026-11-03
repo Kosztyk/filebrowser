@@ -3,13 +3,13 @@ package fbhttp
 import (
 	"errors"
 	"fmt"
+	"github.com/filebrowser/filebrowser/v2/files"
 	"io"
 	"net/http"
 	"net/url"
 	gopath "path"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -47,16 +47,6 @@ type wopiCheckFileInfo struct {
 	BreadcrumbFolderName string `json:"BreadcrumbFolderName,omitempty"`
 }
 
-type wopiLock struct {
-	Value     string
-	ExpiresAt time.Time
-}
-
-var wopiLockStore = struct {
-	sync.Mutex
-	locks map[string]wopiLock
-}{locks: map[string]wopiLock{}}
-
 var wopiFileHandler = func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
 	ctx, status, err := loadWOPIFile(r, d)
 	if status != 0 || err != nil {
@@ -67,21 +57,14 @@ var wopiFileHandler = func(w http.ResponseWriter, r *http.Request, d *data) (int
 		return wopiCheckFileInfoHandler(w, r, d, ctx)
 	}
 
-	switch strings.ToUpper(r.Header.Get("X-WOPI-Override")) {
-	case "LOCK":
-		if r.Header.Get("X-WOPI-OldLock") != "" {
-			return wopiUnlockAndRelock(w, r, ctx.Claims.FileID)
-		}
-		return wopiLockFile(w, r, ctx.Claims.FileID)
-	case "UNLOCK":
-		return wopiUnlockFile(w, r, ctx.Claims.FileID)
-	case "REFRESH_LOCK":
-		return wopiRefreshLock(w, r, ctx.Claims.FileID)
-	case "GET_LOCK":
-		return wopiGetLock(w, ctx.Claims.FileID)
-	default:
-		return http.StatusNotImplemented, nil
+	if !ctx.Claims.CanWrite || !d.user.Perm.Modify {
+		return http.StatusForbidden, nil
 	}
+	if d.features == nil {
+		return http.StatusServiceUnavailable, nil
+	}
+	return d.features.officeLock(w, r, d, ctx)
+
 }
 
 var wopiFileContentsHandler = func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
@@ -201,20 +184,32 @@ func wopiPutFile(w http.ResponseWriter, r *http.Request, d *data, ctx *wopiFileC
 		return http.StatusForbidden, nil
 	}
 
+	if d.features == nil {
+		return http.StatusServiceUnavailable, nil
+	}
+	d.features.office.Lock()
+	defer d.features.office.Unlock()
 	requestedLock := r.Header.Get("X-WOPI-Lock")
-	currentLock, locked := wopiCurrentLock(ctx.Claims.FileID)
+	current, locked := files.GetLease(d.user.Fs, ctx.Claims.Path)
 	if locked {
-		if requestedLock == "" || requestedLock != currentLock {
-			return wopiLockMismatch(w, currentLock, "lock mismatch")
+		if requestedLock == "" || requestedLock != current.Value {
+			return wopiLockMismatch(w, current.Value, "lock mismatch")
+		}
+		version, e := files.Version(d.user.Fs, ctx.Claims.Path)
+		if e != nil || version != current.Before {
+			return wopiLockMismatch(w, current.Value, "file changed outside the office session")
 		}
 	} else if ctx.Info.Size() != 0 {
 		return wopiLockMismatch(w, "", "file is not locked")
 	}
+	d.user.Fs = files.WithLease(d.user.Fs, requestedLock)
+	if expected := r.Header.Get("X-Filebrowser-Version"); expected != "" && expected != wopiVersion(ctx.Info) {
+		return wopiLockMismatch(w, requestedLock, "version mismatch")
+	}
 
-	err := d.RunHook(func() error {
-		_, writeErr := writeFile(d.user.Fs, ctx.Claims.Path, r.Body, d.settings.FileMode, d.settings.DirMode)
-		return writeErr
-	}, "save", ctx.Claims.Path, "", d.user)
+	err := runPublicationHook(d, "save", ctx.Claims.Path, func() error {
+		return d.features.saveOffice(r, d, ctx.Claims.Path)
+	})
 	if err != nil {
 		return errToStatus(err), err
 	}
@@ -222,77 +217,13 @@ func wopiPutFile(w http.ResponseWriter, r *http.Request, d *data, ctx *wopiFileC
 	info, err := d.user.Fs.Stat(ctx.Claims.Path)
 	if err == nil {
 		w.Header().Set("X-WOPI-ItemVersion", wopiVersion(info))
+		if locked && d.features != nil {
+			current.Before, _ = files.Version(d.user.Fs, ctx.Claims.Path)
+			if err = d.features.persistOfficeLock(d, ctx.Claims.Path, current); err != nil {
+				return http.StatusInternalServerError, err
+			}
+		}
 	}
-	return 0, nil
-}
-
-func wopiLockFile(w http.ResponseWriter, r *http.Request, fileID string) (int, error) {
-	requestedLock := r.Header.Get("X-WOPI-Lock")
-	if requestedLock == "" {
-		return http.StatusBadRequest, errors.New("missing X-WOPI-Lock")
-	}
-
-	currentLock, locked := wopiCurrentLock(fileID)
-	if locked && currentLock != requestedLock {
-		return wopiLockMismatch(w, currentLock, "lock mismatch")
-	}
-
-	ttl, status, err := wopiLockTTL(r)
-	if status != 0 || err != nil {
-		return status, err
-	}
-	wopiSetLock(fileID, requestedLock, ttl)
-	return 0, nil
-}
-
-func wopiUnlockFile(w http.ResponseWriter, r *http.Request, fileID string) (int, error) {
-	requestedLock := r.Header.Get("X-WOPI-Lock")
-	currentLock, locked := wopiCurrentLock(fileID)
-	if !locked || currentLock != requestedLock {
-		return wopiLockMismatch(w, currentLock, "lock mismatch")
-	}
-	wopiClearLock(fileID)
-	return 0, nil
-}
-
-func wopiRefreshLock(w http.ResponseWriter, r *http.Request, fileID string) (int, error) {
-	requestedLock := r.Header.Get("X-WOPI-Lock")
-	currentLock, locked := wopiCurrentLock(fileID)
-	if !locked || currentLock != requestedLock {
-		return wopiLockMismatch(w, currentLock, "lock mismatch")
-	}
-
-	ttl, status, err := wopiLockTTL(r)
-	if status != 0 || err != nil {
-		return status, err
-	}
-	wopiSetLock(fileID, requestedLock, ttl)
-	return 0, nil
-}
-
-func wopiUnlockAndRelock(w http.ResponseWriter, r *http.Request, fileID string) (int, error) {
-	oldLock := r.Header.Get("X-WOPI-OldLock")
-	newLock := r.Header.Get("X-WOPI-Lock")
-	if newLock == "" {
-		return http.StatusBadRequest, errors.New("missing X-WOPI-Lock")
-	}
-
-	currentLock, locked := wopiCurrentLock(fileID)
-	if !locked || currentLock != oldLock {
-		return wopiLockMismatch(w, currentLock, "lock mismatch")
-	}
-
-	ttl, status, err := wopiLockTTL(r)
-	if status != 0 || err != nil {
-		return status, err
-	}
-	wopiSetLock(fileID, newLock, ttl)
-	return 0, nil
-}
-
-func wopiGetLock(w http.ResponseWriter, fileID string) (int, error) {
-	currentLock, _ := wopiCurrentLock(fileID)
-	w.Header().Set("X-WOPI-Lock", currentLock)
 	return 0, nil
 }
 
@@ -306,35 +237,6 @@ func wopiLockTTL(r *http.Request) (time.Duration, int, error) {
 		return 0, http.StatusBadRequest, errors.New("invalid X-WOPI-LockExpirationTimeout")
 	}
 	return time.Duration(seconds) * time.Second, 0, nil
-}
-
-func wopiCurrentLock(fileID string) (string, bool) {
-	wopiLockStore.Lock()
-	defer wopiLockStore.Unlock()
-
-	lock, ok := wopiLockStore.locks[fileID]
-	if !ok {
-		return "", false
-	}
-
-	if time.Now().After(lock.ExpiresAt) {
-		delete(wopiLockStore.locks, fileID)
-		return "", false
-	}
-
-	return lock.Value, true
-}
-
-func wopiSetLock(fileID, lockValue string, ttl time.Duration) {
-	wopiLockStore.Lock()
-	defer wopiLockStore.Unlock()
-	wopiLockStore.locks[fileID] = wopiLock{Value: lockValue, ExpiresAt: time.Now().Add(ttl)}
-}
-
-func wopiClearLock(fileID string) {
-	wopiLockStore.Lock()
-	defer wopiLockStore.Unlock()
-	delete(wopiLockStore.locks, fileID)
 }
 
 func wopiLockMismatch(w http.ResponseWriter, currentLock, reason string) (int, error) {

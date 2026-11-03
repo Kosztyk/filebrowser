@@ -1,0 +1,8 @@
+✓ Lockfile passes supply-chain policies (verified 21m ago)
+Lockfile is up to date, resolution step is skipped
+Packages: +2 -1
+++-
+Progress: resolved 2, reused 2, downloaded 0, added 2, done
+Agent skills awaiting approval: qrcode.vue.
+Run "pnpm approve" to review them.
+Done in 863ms using pnpm v12.16.1

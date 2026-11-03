@@ -1,5 +1,6 @@
+import { operationID } from "@/utils/operationId";
 import { useAuthStore } from "@/stores/auth";
-import { renew, logout } from "@/utils/auth";
+import { renew, logout, ensureFreshToken } from "@/utils/auth";
 import { baseURL } from "@/utils/constants";
 import { encodePath } from "@/utils/url";
 
@@ -21,9 +22,20 @@ export async function fetchURL(
 ): Promise<Response> {
   const authStore = useAuthStore();
 
+  if (auth) await ensureFreshToken();
+  const sentToken = authStore.jwt;
   opts = opts || {};
   opts.headers = opts.headers || {};
 
+  if (
+    opts.method === "POST" &&
+    /^\/api\/(archive\/(create|extract)|convertx\/convert|share|downloads|clamav\/scan)/.test(
+      url
+    ) &&
+    !opts.headers["Idempotency-Key"]
+  ) {
+    opts.headers["Idempotency-Key"] = operationID();
+  }
   const { headers, ...rest } = opts;
   let res;
   try {
@@ -42,7 +54,11 @@ export async function fetchURL(
     throw new StatusError("000 No connection", 0);
   }
 
-  if (auth && res.headers.get("X-Renew-Token") === "true") {
+  if (
+    auth &&
+    authStore.jwt === sentToken &&
+    res.headers.get("X-Renew-Token") === "true"
+  ) {
     await renew(authStore.jwt);
   }
 
@@ -53,7 +69,7 @@ export async function fetchURL(
       res.status
     );
 
-    if (auth && res.status == 401) {
+    if (auth && authStore.jwt === sentToken && res.status == 401) {
       logout();
     }
 
@@ -66,7 +82,7 @@ export async function fetchURL(
 export async function fetchJSON<T>(url: string, opts?: any): Promise<T> {
   const res = await fetchURL(url, opts);
 
-  if (res.status === 200) {
+  if (res.status >= 200 && res.status < 300) {
     return res.json() as Promise<T>;
   }
 

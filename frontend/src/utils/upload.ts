@@ -148,28 +148,39 @@ export async function checkConflict(
   return conflicts;
 }
 
-export function scanFiles(dt: DataTransfer): Promise<UploadList | FileList> {
-  return new Promise((resolve) => {
-    let reading = 0;
+export function scanFiles(dt: DataTransfer): Promise<UploadList> {
+  return new Promise((resolve, reject) => {
+    // Hold a reference while scheduling the top-level entries. Some entry APIs
+    // invoke callbacks immediately, and an empty/unsupported drop must settle too.
+    let reading = 1;
     const contents: UploadList = [];
 
-    if (dt.items) {
-      // ts didn't like the for of loop even tho
-      // it is the official example on MDN
-      // for (const item of dt.items) {
+    const addFile = (file: File) =>
+      contents.push({
+        file,
+        name: file.name,
+        size: file.size,
+        isDir: false,
+        fullPath: file.name,
+      });
+    if (dt.items?.length) {
       for (let i = 0; i < dt.items.length; i++) {
         const item = dt.items[i];
-        if (
-          item.kind === "file" &&
+        if (item.kind !== "file") continue;
+        const entry =
           typeof item.webkitGetAsEntry === "function"
-        ) {
-          const entry = item.webkitGetAsEntry();
-          entry && readEntry(entry);
+            ? item.webkitGetAsEntry()
+            : null;
+        if (entry) readEntry(entry);
+        else {
+          const file = item.getAsFile();
+          if (file) addFile(file);
         }
       }
     } else {
-      resolve(dt.files);
+      Array.from(dt.files).forEach(addFile);
     }
+    if (--reading === 0) resolve(contents);
 
     function readEntry(entry: FileSystemEntry, directory = ""): void {
       if (entry.isFile) {
@@ -188,7 +199,7 @@ export function scanFiles(dt: DataTransfer): Promise<UploadList | FileList> {
           if (reading === 0) {
             resolve(contents);
           }
-        });
+        }, reject);
       } else if (entry.isDirectory) {
         const dir = {
           isDir: true,
@@ -228,7 +239,7 @@ export function scanFiles(dt: DataTransfer): Promise<UploadList | FileList> {
         if (reading === 0) {
           resolve(contents);
         }
-      });
+      }, reject);
     }
   });
 }

@@ -12,7 +12,11 @@
         />
         <action
           :icon="isNativeFullscreen ? 'fullscreen_exit' : 'fullscreen'"
-          :label="isNativeFullscreen ? t('buttons.exitFullscreen') : t('buttons.fullscreen')"
+          :label="
+            isNativeFullscreen
+              ? t('buttons.exitFullscreen')
+              : t('buttons.fullscreen')
+          "
           @action="toggleNativeFullscreen"
         />
         <action

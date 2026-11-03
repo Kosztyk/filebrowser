@@ -1,0 +1,12 @@
+$ vitest run
+
+ RUN  v5.0.5 /workspace/scratch/989234643726/batch1/filebrowser/frontend
+
+(node:263) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  10 passed (10)
+      Tests  42 passed (42)
+   Start at  20:45:27
+   Duration  6.97s (transform 61%, environment 22%, import 15%, tests 2%, worker 1%)
+

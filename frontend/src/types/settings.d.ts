@@ -1,4 +1,15 @@
+interface SettingsWork {
+  workers: number;
+  maxJobs: number;
+  archiveBytes: number;
+  archiveEntries: number;
+  archiveDepth: number;
+  archiveSeconds: number;
+  reserveBytes: number;
+  artifactBytes: number;
+}
 interface ISettings {
+  work: SettingsWork;
   signup: boolean;
   createUserDir: boolean;
   hideLoginButton: boolean;
@@ -41,6 +52,11 @@ interface SettingsBranding {
 }
 
 interface SettingsTus {
+  retentionHours: number;
+  concurrentUploads: number;
+  maxActiveUploads: number;
+  maxPendingBytes: number;
+  reserveBytes: number;
   chunkSize: number;
   retryCount: number;
 }
@@ -56,6 +72,10 @@ interface SettingsCollabora {
 }
 
 interface SettingsConvertX {
+  connectTimeout?: string;
+  uploadTimeout?: string;
+  processTimeout?: string;
+  downloadTimeout?: string;
   configured: boolean;
   enabled: boolean;
   url: string;
@@ -76,6 +96,10 @@ interface SettingsErugo {
 }
 
 interface SettingsClamAV {
+  automaticMaxBytes: number;
+  oversizePolicy: "skip" | "scan" | "block";
+  scanWorkers: number;
+  scanTimeout: string;
   enabled: boolean;
   url: string;
   scanDepth: number;

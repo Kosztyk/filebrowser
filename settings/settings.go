@@ -30,6 +30,7 @@ type Settings struct {
 	AuthMethod            AuthMethod          `json:"authMethod"`
 	LogoutPage            string              `json:"logoutPage"`
 	Branding              Branding            `json:"branding"`
+	Work                  Work                `json:"work"`
 	Tus                   Tus                 `json:"tus"`
 	Collabora             Collabora           `json:"collabora"`
 	ConvertX              ConvertX            `json:"convertx"`

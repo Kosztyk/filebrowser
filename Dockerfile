@@ -1,5 +1,5 @@
 ## Multistage build: First stage fetches dependencies
-FROM alpine:3.23 AS fetcher
+FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS fetcher
 
 # install and copy ca-certificates, mailcap, and tini-static; download JSON.sh
 RUN apk update && \
@@ -7,7 +7,7 @@ RUN apk update && \
     wget -O /JSON.sh https://raw.githubusercontent.com/dominictarr/JSON.sh/0d5e5c77365f63809bf6e77ef44a1f34b0e05840/JSON.sh
 
 ## Second stage: Use lightweight BusyBox image for final runtime environment
-FROM busybox:1.37.0-musl
+FROM busybox:1.38.0-musl@sha256:80e38f9a1b39188b8bdb28879178edb322a4402b081a9aedda1924609decd6f6
 
 # Define non-root user UID and GID
 ENV UID=1000
@@ -31,7 +31,7 @@ COPY --from=fetcher /etc/ssl /etc/ssl
 # Create data directories, set ownership, and ensure healthcheck script is executable
 RUN mkdir -p /config /database /srv && \
     chown -R user:user /config /database /srv \
-    && chmod +x /healthcheck.sh
+    && chmod +x /healthcheck.sh /init.sh
 
 # Define healthcheck script
 HEALTHCHECK --start-period=2s --interval=5s --timeout=3s CMD /healthcheck.sh

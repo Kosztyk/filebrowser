@@ -1,3 +1,5 @@
+> **Current fork documentation:** For File Browser **3.3.1**, use [README](README.md) and [installation/upgrade](docs/INSTALL_3.3.1.md), plus [integrations](docs/INTEGRATIONS_3.3.1.md). Material below is retained as historical/underlying reference and may describe earlier versions.
+
 # File Browser ConvertX "Convert to..." action
 
 This build adds a server-side ConvertX integration to File Browser.

@@ -16,6 +16,7 @@
     @touchcancel="handleTouchCancel"
     @touchmove="handleTouchMove"
     :data-dir="isDir"
+    :data-url="url"
     :data-type="type"
     :aria-label="name"
     :aria-selected="isSelected"
@@ -90,7 +91,9 @@ const layoutStore = useLayoutStore();
 const singleClick = computed(
   () => (props.archive || !props.readOnly) && authStore.user?.singleClick
 );
-const isArchiveItem = computed(() => props.type === "archive" && !props.archive);
+const isArchiveItem = computed(
+  () => props.type === "archive" && !props.archive
+);
 const isSelected = computed(
   () => fileStore.selected.indexOf(props.index) !== -1
 );
@@ -168,13 +171,6 @@ const drop = async (event: Event) => {
 
   if (fileStore.selectedCount === 0) return;
 
-  let el = event.target as HTMLElement | null;
-  for (let i = 0; i < 5; i++) {
-    if (el !== null && !el.classList.contains("item")) {
-      el = el.parentElement;
-    }
-  }
-
   const items: any[] = [];
 
   for (const i of fileStore.selected) {
@@ -192,11 +188,7 @@ const drop = async (event: Event) => {
     }
   }
 
-  // Get url from ListingItem instance
-  if (el === null) {
-    return;
-  }
-  const path = el.__vue__.url;
+  const path = props.url;
 
   const action = (overwrite?: boolean, rename?: boolean) => {
     const action =
@@ -263,13 +255,9 @@ const itemClick = (event: Event | KeyboardEvent) => {
 
 const contextMenu = (event: MouseEvent) => {
   event.preventDefault();
-  if (
-    fileStore.selected.length === 0 ||
-    event.ctrlKey ||
-    fileStore.selected.indexOf(props.index) === -1
-  ) {
-    click(event);
-  }
+  if (fileStore.selected.includes(props.index)) return;
+  if (!event.ctrlKey && !event.metaKey) fileStore.selected = [];
+  fileStore.selected.push(props.index);
 };
 
 const click = (event: Event | KeyboardEvent) => {
@@ -311,7 +299,10 @@ const click = (event: Event | KeyboardEvent) => {
     }
 
     for (; fi <= la; fi++) {
-      if (fileStore.selected.indexOf(fi) == -1) {
+      if (
+        fileStore.req?.items[fi]?.pageVisible !== false &&
+        fileStore.selected.indexOf(fi) == -1
+      ) {
         fileStore.selected.push(fi);
       }
     }

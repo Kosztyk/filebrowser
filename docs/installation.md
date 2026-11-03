@@ -1,3 +1,5 @@
+> **Current fork documentation:** For File Browser **3.3.1**, use [README](../README.md) and [installation/upgrade](INSTALL_3.3.1.md), plus [integrations](INTEGRATIONS_3.3.1.md). Material below is retained as historical/underlying reference and may describe earlier versions.
+
 # Installation
 
 File Browser is a single binary and can be used as standalone executable. However, it is also available as a [Docker](https://www.docker.com) image. The installation and first time setup is quite straightforward independently of which system you use.

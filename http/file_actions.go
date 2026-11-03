@@ -13,13 +13,13 @@ import (
 	gopath "path"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/mholt/archives"
 	"github.com/spf13/afero"
 
 	fberrors "github.com/filebrowser/filebrowser/v2/errors"
+	"github.com/filebrowser/filebrowser/v2/files"
 	"github.com/filebrowser/filebrowser/v2/fileutils"
 )
 
@@ -60,33 +60,6 @@ type archiveCreatePlan struct {
 	Overwrite   bool
 }
 
-const fileActionJobTTL = 2 * time.Hour
-
-type clamAVScanJobStore struct {
-	mu   sync.Mutex
-	jobs map[string]clamAVScanJobEntry
-}
-
-type clamAVScanJobEntry struct {
-	Response  clamAVPathScanResponse
-	UpdatedAt time.Time
-}
-
-type archiveCreateJobStore struct {
-	mu   sync.Mutex
-	jobs map[string]archiveCreateJobEntry
-}
-
-type archiveCreateJobEntry struct {
-	Response  archiveCreateResponse
-	UpdatedAt time.Time
-}
-
-var (
-	clamAVScanJobs    = &clamAVScanJobStore{jobs: map[string]clamAVScanJobEntry{}}
-	archiveCreateJobs = &archiveCreateJobStore{jobs: map[string]archiveCreateJobEntry{}}
-)
-
 var clamAVPathScanHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
 	if !d.user.Perm.Download {
 		return http.StatusForbidden, nil
@@ -105,19 +78,15 @@ var clamAVPathScanHandler = withUser(func(w http.ResponseWriter, r *http.Request
 		return runClamAVPathScanSync(w, r, d, requestedPath)
 	}
 
-	jobID := newFileActionJobID()
-	response := clamAVPathScanResponse{
-		JobID:   jobID,
-		Status:  "running",
-		Message: fmt.Sprintf("Security scan started for %q.", requestedPath),
-		Path:    requestedPath,
+	if d.features != nil {
+		j, e := d.features.submit(d, "scan", struct{ Path string }{requestedPath}, nil)
+		if e != nil {
+			return errToStatus(e), e
+		}
+		w.WriteHeader(http.StatusAccepted)
+		return renderJSON(w, r, clamAVPathScanResponse{JobID: j.ID, Status: "running", Path: requestedPath})
 	}
-	clamAVScanJobs.set(jobID, response)
-
-	go runClamAVPathScanJob(jobID, d, requestedPath)
-
-	w.WriteHeader(http.StatusAccepted)
-	return renderJSON(w, r, response)
+	return http.StatusServiceUnavailable, nil
 })
 
 var clamAVScanJobStatusHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
@@ -130,12 +99,10 @@ var clamAVScanJobStatusHandler = withUser(func(w http.ResponseWriter, r *http.Re
 		return http.StatusBadRequest, fberrors.ErrInvalidRequestParams
 	}
 
-	response, ok := clamAVScanJobs.get(jobID)
-	if !ok {
-		return http.StatusNotFound, os.ErrNotExist
+	if d.features != nil {
+		return legacyJobStatus(w, r, d, jobID, "scan")
 	}
-
-	return renderJSON(w, r, response)
+	return http.StatusServiceUnavailable, nil
 })
 
 var archiveCreateHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
@@ -161,20 +128,18 @@ var archiveCreateHandler = withUser(func(w http.ResponseWriter, r *http.Request,
 		return renderJSON(w, r, response)
 	}
 
-	jobID := newFileActionJobID()
-	response := archiveCreateResponse{
-		JobID:       jobID,
-		Status:      "running",
-		Message:     fmt.Sprintf("Archive creation started: %s", plan.Destination),
-		Destination: plan.Destination,
-		Format:      strings.TrimPrefix(plan.Extension, "."),
+	if d.features != nil {
+		rename := false
+		request.Rename = &rename
+		request.Destination = plan.Destination
+		j, e := d.features.submit(d, "archive", request, []string{plan.Destination})
+		if e != nil {
+			return errToStatus(e), e
+		}
+		w.WriteHeader(http.StatusAccepted)
+		return renderJSON(w, r, archiveCreateResponse{JobID: j.ID, Status: "running", Destination: plan.Destination, Format: strings.TrimPrefix(plan.Extension, ".")})
 	}
-	archiveCreateJobs.set(jobID, response)
-
-	go runArchiveCreateJob(jobID, d, plan)
-
-	w.WriteHeader(http.StatusAccepted)
-	return renderJSON(w, r, response)
+	return http.StatusServiceUnavailable, nil
 })
 
 var archiveCreateJobStatusHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
@@ -187,12 +152,10 @@ var archiveCreateJobStatusHandler = withUser(func(w http.ResponseWriter, r *http
 		return http.StatusBadRequest, fberrors.ErrInvalidRequestParams
 	}
 
-	response, ok := archiveCreateJobs.get(jobID)
-	if !ok {
-		return http.StatusNotFound, os.ErrNotExist
+	if d.features != nil {
+		return legacyJobStatus(w, r, d, jobID, "archive")
 	}
-
-	return renderJSON(w, r, response)
+	return http.StatusServiceUnavailable, nil
 })
 
 func runClamAVPathScanSync(w http.ResponseWriter, r *http.Request, d *data, requestedPath string) (int, error) {
@@ -216,42 +179,6 @@ func runClamAVPathScanSync(w http.ResponseWriter, r *http.Request, d *data, requ
 	return renderJSON(w, r, cleanClamAVPathScanResponse(requestedPath, scanned))
 }
 
-func runClamAVPathScanJob(jobID string, d *data, requestedPath string) {
-	response := clamAVPathScanResponse{JobID: jobID, Status: "running", Path: requestedPath}
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			response.Status = "error"
-			response.Done = true
-			response.Message = fmt.Sprintf("Security scan failed for %q: %v", requestedPath, recovered)
-			clamAVScanJobs.set(jobID, response)
-		}
-	}()
-
-	scanned, threat, err := scanExistingPathWithClamAV(context.Background(), d, requestedPath)
-	response.Scanned = scanned
-	response.Done = true
-
-	if threat != nil {
-		response.Status = "infected"
-		response.Message = manualClamAVThreatMessage(threat)
-		response.Infected = true
-		response.Threat = cleanClamAVMessage(threat.Threat, threat.FileName)
-		clamAVScanJobs.set(jobID, response)
-		return
-	}
-
-	if err != nil {
-		response.Status = "error"
-		response.Message = err.Error()
-		clamAVScanJobs.set(jobID, response)
-		return
-	}
-
-	response = cleanClamAVPathScanResponse(requestedPath, scanned)
-	response.JobID = jobID
-	clamAVScanJobs.set(jobID, response)
-}
-
 func cleanClamAVPathScanResponse(requestedPath string, scanned int) clamAVPathScanResponse {
 	message := fmt.Sprintf("Security scan completed. No malware was found in %q.", requestedPath)
 	if scanned != 1 {
@@ -269,49 +196,18 @@ func cleanClamAVPathScanResponse(requestedPath string, scanned int) clamAVPathSc
 
 func runArchiveCreateSync(ctx context.Context, d *data, plan *archiveCreatePlan) (archiveCreateResponse, error) {
 	response := archiveCreateResponse{Destination: plan.Destination, Format: strings.TrimPrefix(plan.Extension, "."), Done: true}
-	err := d.RunHook(func() error {
+	err := runPublicationHook(d, "upload", plan.Destination, func() error {
 		archived, archiveErr := createArchiveFromPaths(ctx, d, plan.Paths, plan.Destination, plan.Archiver, plan.Overwrite)
 		response.Archived = archived
 		return archiveErr
-	}, "upload", plan.Destination, "", d.user)
+	})
 	if err != nil {
-		_ = d.user.Fs.Remove(plan.Destination)
 		return response, err
 	}
 
 	response.Status = "done"
 	response.Message = fmt.Sprintf("Archive created: %s", plan.Destination)
 	return response, nil
-}
-
-func runArchiveCreateJob(jobID string, d *data, plan *archiveCreatePlan) {
-	response := archiveCreateResponse{
-		JobID:       jobID,
-		Status:      "running",
-		Destination: plan.Destination,
-		Format:      strings.TrimPrefix(plan.Extension, "."),
-	}
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			_ = d.user.Fs.Remove(plan.Destination)
-			response.Status = "error"
-			response.Done = true
-			response.Message = fmt.Sprintf("Archive creation failed for %s: %v", plan.Destination, recovered)
-			archiveCreateJobs.set(jobID, response)
-		}
-	}()
-
-	completed, err := runArchiveCreateSync(context.Background(), d, plan)
-	completed.JobID = jobID
-	if err != nil {
-		completed.Status = "error"
-		completed.Done = true
-		completed.Message = err.Error()
-		archiveCreateJobs.set(jobID, completed)
-		return
-	}
-
-	archiveCreateJobs.set(jobID, completed)
 }
 
 func prepareArchiveCreatePlan(request archiveCreateRequest, d *data) (*archiveCreatePlan, int, error) {
@@ -371,54 +267,6 @@ func newFileActionJobID() string {
 	return hex.EncodeToString(bytes)
 }
 
-func (s *clamAVScanJobStore) set(jobID string, response clamAVPathScanResponse) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.cleanupLocked()
-	s.jobs[jobID] = clamAVScanJobEntry{Response: response, UpdatedAt: time.Now()}
-}
-
-func (s *clamAVScanJobStore) get(jobID string) (clamAVPathScanResponse, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.cleanupLocked()
-	entry, ok := s.jobs[jobID]
-	return entry.Response, ok
-}
-
-func (s *clamAVScanJobStore) cleanupLocked() {
-	cutoff := time.Now().Add(-fileActionJobTTL)
-	for id, entry := range s.jobs {
-		if entry.UpdatedAt.Before(cutoff) {
-			delete(s.jobs, id)
-		}
-	}
-}
-
-func (s *archiveCreateJobStore) set(jobID string, response archiveCreateResponse) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.cleanupLocked()
-	s.jobs[jobID] = archiveCreateJobEntry{Response: response, UpdatedAt: time.Now()}
-}
-
-func (s *archiveCreateJobStore) get(jobID string) (archiveCreateResponse, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.cleanupLocked()
-	entry, ok := s.jobs[jobID]
-	return entry.Response, ok
-}
-
-func (s *archiveCreateJobStore) cleanupLocked() {
-	cutoff := time.Now().Add(-fileActionJobTTL)
-	for id, entry := range s.jobs {
-		if entry.UpdatedAt.Before(cutoff) {
-			delete(s.jobs, id)
-		}
-	}
-}
-
 func scanExistingPathWithClamAV(ctx context.Context, d *data, scanPath string) (int, *clamAVThreatError, error) {
 	cfg := d.settings.ClamAV
 	if strings.TrimSpace(cfg.URL) == "" {
@@ -442,7 +290,11 @@ func scanExistingPathWithClamAV(ctx context.Context, d *data, scanPath string) (
 		}
 		defer file.Close()
 
+		if e := ctx.Err(); e != nil {
+			return e
+		}
 		scanned++
+		reportJobProgress(ctx, 1, 0)
 		return scanWithClamAV(ctx, cfg, strings.TrimPrefix(filePath, "/"), file)
 	}
 
@@ -459,8 +311,11 @@ func scanExistingPathWithClamAV(ctx context.Context, d *data, scanPath string) (
 	}
 
 	err = afero.Walk(d.user.Fs, scanPath, func(filePath string, info fs.FileInfo, walkErr error) error {
+		if e := ctx.Err(); e != nil {
+			return e
+		}
 		if walkErr != nil {
-			return nil
+			return walkErr
 		}
 		if filePath == scanPath {
 			return nil
@@ -573,15 +428,11 @@ func defaultArchiveCreateDestination(paths []string, extension string) string {
 }
 
 func createArchiveFromPaths(ctx context.Context, d *data, paths []string, destination string, archiver archives.Archival, overwrite bool) (int, error) {
-	commonDir := archiveCreateCommonDir(paths)
-	allFiles := make([]archives.FileInfo, 0)
-
-	for _, path := range paths {
-		archiveFiles, err := getFiles(d, path, commonDir)
-		if err != nil {
-			return 0, err
-		}
-		allFiles = append(allFiles, archiveFiles...)
+	ctx, cancel := archiveContext(ctx, d)
+	defer cancel()
+	allFiles, err := collectArchiveFiles(ctx, d, paths, archiveCreateCommonDir(paths))
+	if err != nil {
+		return 0, err
 	}
 
 	if len(allFiles) == 0 {
@@ -597,16 +448,56 @@ func createArchiveFromPaths(ctx context.Context, d *data, paths []string, destin
 		}
 	}
 
-	out, err := d.user.Fs.OpenFile(destination, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, d.settings.FileMode)
+	staged, out, err := files.NewStagedFile(d.user.Fs, destination, newFileActionJobID(), d.settings.FileMode, d.settings.DirMode)
 	if err != nil {
 		return 0, err
 	}
+	defer func() { _ = staged.Abort() }()
 	defer out.Close()
 
 	if err := archiver.Archive(ctx, out, allFiles); err != nil {
 		return 0, err
 	}
 
+	if err = out.Sync(); err != nil {
+		return 0, err
+	}
+	if err = out.Close(); err != nil {
+		return 0, err
+	}
+	if e := ctx.Err(); e != nil {
+		return 0, e
+	}
+	if f, id := jobForContext(ctx); f != nil {
+		j, e := f.get(id)
+		if e != nil {
+			return 0, e
+		}
+		fresh, e := f.jobData(j)
+		if e != nil || !fresh.user.Perm.Create || !fresh.Check(destination) {
+			return 0, os.ErrPermission
+		}
+		if expected, ok := j.Versions[destination]; !ok || expected != staged.Before {
+			return 0, files.ErrWriteConflict
+		}
+		var req archiveCreateRequest
+		_ = json.Unmarshal(j.Payload, &req)
+		if e = f.recordPublication(&j, staged, archiveCreateResponse{JobID: id, Status: "done", Destination: destination, Format: req.Format, Archived: len(allFiles), Done: true}); e != nil {
+			return 0, e
+		}
+	}
+	if _, err = staged.Commit(); err != nil {
+		return 0, err
+	}
+	if f, id := jobForContext(ctx); f != nil {
+		v, e := files.Version(d.user.Fs, destination)
+		if e != nil {
+			return 0, e
+		}
+		if e = f.finishPublication(id, destination, v); e != nil {
+			return 0, e
+		}
+	}
 	return len(allFiles), nil
 }
 

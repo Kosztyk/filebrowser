@@ -121,6 +121,7 @@
       </template>
     </header-bar>
 
+    <DirectoryPages v-if="!layoutStore.loading" ref="directoryPages" />
     <div
       v-if="isMobile"
       id="file-selection"
@@ -253,6 +254,8 @@
                 role="button"
                 tabindex="0"
                 @click="sort('name')"
+                @keydown.enter.prevent="sort('name')"
+                @keydown.space.prevent="sort('name')"
                 :title="t('files.sortByName')"
                 :aria-label="t('files.sortByName')"
               >
@@ -266,6 +269,8 @@
                 role="button"
                 tabindex="0"
                 @click="sort('size')"
+                @keydown.enter.prevent="sort('size')"
+                @keydown.space.prevent="sort('size')"
                 :title="t('files.sortBySize')"
                 :aria-label="t('files.sortBySize')"
               >
@@ -278,6 +283,8 @@
                 role="button"
                 tabindex="0"
                 @click="sort('modified')"
+                @keydown.enter.prevent="sort('modified')"
+                @keydown.space.prevent="sort('modified')"
                 :title="t('files.sortByLastModified')"
                 :aria-label="t('files.sortByLastModified')"
               >
@@ -458,6 +465,7 @@
 </template>
 
 <script setup lang="ts">
+import DirectoryPages from "@/components/files/DirectoryPages.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useClipboardStore } from "@/stores/clipboard";
 import { useFileStore } from "@/stores/file";
@@ -518,6 +526,7 @@ onBeforeRouteUpdate(() => {
 const { t } = useI18n();
 
 const listing = ref<HTMLElement | null>(null);
+const directoryPages = ref<InstanceType<typeof DirectoryPages> | null>(null);
 
 const nameSorted = computed(() =>
   fileStore.req ? fileStore.req.sorting.by === "name" : false
@@ -542,6 +551,7 @@ const items = computed(() => {
   const files: any[] = [];
 
   fileStore.req?.items.forEach((item) => {
+    if (item.pageVisible === false) return;
     if (item.isDir) {
       dirs.push(item);
     } else {
@@ -814,6 +824,14 @@ onBeforeUnmount(() => {
 const base64 = (name: string) => Base64.encodeURI(name);
 
 const keyEvent = (event: KeyboardEvent) => {
+  // Typing in the folder filter must never select, rename or delete files.
+  const target = event.target;
+  if (
+    target instanceof HTMLElement &&
+    target.closest('input, textarea, select, [contenteditable="true"]')
+  )
+    return;
+
   // No prompts are shown
   if (layoutStore.currentPrompt !== null) {
     return;
@@ -1091,7 +1109,14 @@ const drop = async (event: DragEvent) => {
     }
   }
 
-  const files: UploadList = (await upload.scanFiles(dt)) as UploadList;
+  let files: UploadList;
+  try {
+    files = await upload.scanFiles(dt);
+  } catch (error: any) {
+    $showError(error);
+    return;
+  }
+  if (files.length === 0) return;
   let path = route.path.endsWith("/") ? route.path : route.path + "/";
 
   if (
@@ -1099,9 +1124,7 @@ const drop = async (event: DragEvent) => {
     el.classList.contains("item") &&
     el.dataset.dir === "true"
   ) {
-    // Get url from ListingItem instance
-    // TODO: Don't know what is happening here
-    path = el.__vue__.url;
+    path = el.dataset.url || path;
 
     try {
       (await api.fetch(path)).items;
@@ -1222,6 +1245,10 @@ const resetOpacity = () => {
 };
 
 const sort = async (by: string) => {
+  if (fileStore.req?.page && directoryPages.value) {
+    directoryPages.value.sortBy(by);
+    return;
+  }
   let asc = false;
 
   if (by === "name") {
@@ -1535,15 +1562,17 @@ const fillWindow = (fit = false) => {
 const revealPreviousItem = () => {
   if (!fileStore.req || !fileStore.oldReq) return;
 
-  const index = fileStore.selected[0];
-  if (index === undefined) return;
-
-  showLimit.value =
-    index + Math.ceil((window.innerHeight * 2) / itemWeight.value);
+  if (fileStore.oldReq.isDir) return false;
+  const selected = fileStore.req.items[fileStore.selected[0]];
+  if (!selected || selected.pageVisible === false) return;
+  const visibleItems = [...items.value.dirs, ...items.value.files];
+  const index = visibleItems.findIndex((item) => item.url === selected.url);
+  if (index < 0) return;
+  showLimit.value = Math.max(showLimit.value, index + 1);
 
   nextTick(() => {
-    const items = document.querySelectorAll("#listing .item");
-    items[index].scrollIntoView({ block: "center" });
+    const rendered = document.querySelectorAll("#listing .item:not(.header)");
+    rendered[index]?.scrollIntoView({ block: "center" });
   });
 
   return true;

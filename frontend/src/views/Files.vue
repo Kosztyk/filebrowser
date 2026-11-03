@@ -46,9 +46,14 @@ import FileListing from "@/views/files/FileListing.vue";
 import { StatusError } from "@/api/utils";
 import { collaboraEnabled, name } from "../utils/constants";
 
+const BoundedText = defineAsyncComponent(
+  () => import("@/views/files/BoundedText.vue")
+);
 const Editor = defineAsyncComponent(() => import("@/views/files/Editor.vue"));
 const Preview = defineAsyncComponent(() => import("@/views/files/Preview.vue"));
-const Collabora = defineAsyncComponent(() => import("@/views/files/Collabora.vue"));
+const Collabora = defineAsyncComponent(
+  () => import("@/views/files/Collabora.vue")
+);
 
 const layoutStore = useLayoutStore();
 const fileStore = useFileStore();
@@ -63,13 +68,14 @@ let fetchDataController = new AbortController();
 
 const error = ref<StatusError | null>(null);
 
-const isCollaboraOfficeView = computed(() =>
-  route.query.office === "true" &&
-  collaboraEnabled &&
-  !!fileStore.req &&
-  !fileStore.req.archive &&
-  !fileStore.req.isDir &&
-  collabora.isSupportedExtension(fileStore.req.extension)
+const isCollaboraOfficeView = computed(
+  () =>
+    route.query.office === "true" &&
+    collaboraEnabled &&
+    !!fileStore.req &&
+    !fileStore.req.archive &&
+    !fileStore.req.isDir &&
+    collabora.isSupportedExtension(fileStore.req.extension)
 );
 
 const currentView = computed(() => {
@@ -79,6 +85,13 @@ const currentView = computed(() => {
 
   if (fileStore.req.isDir) {
     return FileListing;
+  } else if (
+    fileStore.req.size > 5 * 1024 * 1024 &&
+    /\.(csv|log|txt|json|ndjson|xml|md)$/i.test(fileStore.req.name) &&
+    route.query.edit !== "true" &&
+    route.query.office !== "true"
+  ) {
+    return BoundedText;
   } else if (isCollaboraOfficeView.value) {
     return Collabora;
   } else if (fileStore.req.extension.toLowerCase() === ".csv") {
@@ -154,13 +167,18 @@ const applyPreSelection = () => {
 
 const fetchData = async () => {
   // Reset view information.
+  const version = ++fileStore.requestVersion;
+  const refreshing = fileStore.reload;
   fileStore.reload = false;
   fileStore.selected = [];
   fileStore.multiple = false;
   layoutStore.closeHovers();
 
   // Set loading to true and reset the error.
-  layoutStore.loading = true;
+  const sameDirectory =
+    fileStore.req?.page &&
+    fileStore.req.url.replace(/\/$/, "") === route.path.replace(/\/$/, "");
+  layoutStore.loading = !sameDirectory;
   error.value = null;
 
   let url = route.path;
@@ -169,14 +187,41 @@ const fetchData = async () => {
   // Cancel the ongoing request
   fetchDataController.abort();
   fetchDataController = new AbortController();
+  const controller = fetchDataController;
   try {
     const archiveInner = Array.isArray(route.query.archive)
       ? route.query.archive[0]
       : route.query.archive;
+    // Keep the current folder query on reload and when returning from an opened
+    // file/child folder. Otherwise items beyond page one cannot be reselected.
+    const previousDirectory = [fileStore.req, fileStore.oldReq].find(
+      (r) => r?.page && r.url.replace(/\/$/, "") === url.replace(/\/$/, "")
+    );
+    const rememberedQuery = fileStore.directoryQuery;
+    const directoryPage =
+      rememberedQuery?.url.replace(/\/$/, "") === url.replace(/\/$/, "")
+        ? rememberedQuery.page
+        : previousDirectory?.page;
     const res =
       typeof archiveInner === "string"
         ? await api.fetchArchive(url, archiveInner, fetchDataController.signal)
-        : await api.fetch(url, fetchDataController.signal);
+        : directoryPage
+          ? await api.fetchPage(
+              url,
+              {
+                ...directoryPage,
+                ...(refreshing ? { snapshot: "", refresh: true } : {}),
+              },
+              fetchDataController.signal,
+              route.query.edit !== "true"
+            )
+          : await api.fetch(
+              url,
+              fetchDataController.signal,
+              route.query.edit !== "true"
+            );
+    if (version !== fileStore.requestVersion || controller.signal.aborted)
+      return;
     fileStore.updateRequest(res);
     document.title = `${res.name || t("sidebar.myFiles")} - ${t("files.files")} - ${name}`;
     layoutStore.loading = false;
@@ -184,6 +229,8 @@ const fetchData = async () => {
     // Selects the post-reload target item or the previously visited child folder
     applyPreSelection();
   } catch (err) {
+    if (version !== fileStore.requestVersion || controller.signal.aborted)
+      return;
     if (err instanceof StatusError && err.is_canceled) {
       return;
     }

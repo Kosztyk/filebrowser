@@ -1,0 +1,29 @@
+[WebServer] (node:439) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:474) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:515) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › tests/browser/compatibility.spec.ts:93:1 › browser math preview is sanitized and retains MathML (557ms)
+[WebServer] 9:10:28 PM [vite] (client) warning: <tr> cannot be child of <table>, according to HTML specifications. This can cause hydration errors or potentially disrupt future functionality.
+[WebServer] 15 |          <div class="card-content full">
+[WebServer] 16 |            <table>
+[WebServer] 17 |              <tr>
+[WebServer]    |              ^^^^
+[WebServer] 18 |                <th>{{ t("settings.username") }}</th>
+[WebServer]    |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[WebServer] 19 |                <th>{{ t("settings.admin") }}</th>
+[WebServer]    |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[WebServer] 20 |                <th>{{ t("settings.scope") }}</th>
+[WebServer]    |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[WebServer] 21 |                <th></th>
+[WebServer]    |  ^^^^^^^^^^^^^^^^^^^^^^^
+[WebServer] 22 |              </tr>
+[WebServer]    |  ^^^^^^^^^^^^^^^^^
+[WebServer]   Plugin: vite:vue
+[WebServer]   File: /workspace/scratch/989234643726/batch1/filebrowser/frontend/src/views/settings/Users.vue
+
+  1 passed (2.0s)

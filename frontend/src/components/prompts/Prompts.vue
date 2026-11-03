@@ -7,30 +7,38 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import { storeToRefs } from "pinia";
 import { useLayoutStore } from "@/stores/layout";
 
 import BaseModal from "./BaseModal.vue";
-import Help from "./Help.vue";
-import Info from "./Info.vue";
-import Delete from "./Delete.vue";
-import DeleteUser from "./DeleteUser.vue";
-import Download from "./Download.vue";
-import Rename from "./Rename.vue";
-import Move from "./Move.vue";
-import Copy from "./Copy.vue";
-import NewFile from "./NewFile.vue";
-import NewDir from "./NewDir.vue";
-import Replace from "./Replace.vue";
-import Share from "./Share.vue";
-import ErugoReverseShare from "./ErugoReverseShare.vue";
-import ShareDelete from "./ShareDelete.vue";
-import Upload from "./Upload.vue";
-import DiscardEditorChanges from "./DiscardEditorChanges.vue";
-import ResolveConflict from "./ResolveConflict.vue";
-import CurrentPassword from "./CurrentPassword.vue";
-import Convert from "./Convert.vue";
+const Help = defineAsyncComponent(() => import("./Help.vue"));
+const Info = defineAsyncComponent(() => import("./Info.vue"));
+const Delete = defineAsyncComponent(() => import("./Delete.vue"));
+const DeleteUser = defineAsyncComponent(() => import("./DeleteUser.vue"));
+const Download = defineAsyncComponent(() => import("./Download.vue"));
+const Rename = defineAsyncComponent(() => import("./Rename.vue"));
+const Move = defineAsyncComponent(() => import("./Move.vue"));
+const Copy = defineAsyncComponent(() => import("./Copy.vue"));
+const NewFile = defineAsyncComponent(() => import("./NewFile.vue"));
+const NewDir = defineAsyncComponent(() => import("./NewDir.vue"));
+const Replace = defineAsyncComponent(() => import("./Replace.vue"));
+const Share = defineAsyncComponent(() => import("./Share.vue"));
+const ErugoReverseShare = defineAsyncComponent(
+  () => import("./ErugoReverseShare.vue")
+);
+const ShareDelete = defineAsyncComponent(() => import("./ShareDelete.vue"));
+const Upload = defineAsyncComponent(() => import("./Upload.vue"));
+const DiscardEditorChanges = defineAsyncComponent(
+  () => import("./DiscardEditorChanges.vue")
+);
+const ResolveConflict = defineAsyncComponent(
+  () => import("./ResolveConflict.vue")
+);
+const CurrentPassword = defineAsyncComponent(
+  () => import("./CurrentPassword.vue")
+);
+const Convert = defineAsyncComponent(() => import("./Convert.vue"));
 
 const layoutStore = useLayoutStore();
 

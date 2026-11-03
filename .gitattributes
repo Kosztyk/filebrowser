@@ -1,0 +1,4 @@
+# Diagnostic logs preserve verbatim output from external test tools.
+validation/results/** whitespace=-trailing-space,-blank-at-eof
+# pnpm patch format contains diff-context leading spaces before tabs.
+frontend/patches/*.patch whitespace=-space-before-tab

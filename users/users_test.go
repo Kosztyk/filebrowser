@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/filebrowser/filebrowser/v2/files"
-	"github.com/spf13/afero"
 )
 
 // TestUserCleanFs verifies that Clean builds the user filesystem according to the
@@ -28,13 +27,13 @@ func TestUserCleanFs(t *testing.T) {
 		}
 	})
 
-	t.Run("followExternalSymlinks builds a bare BasePathFs", func(t *testing.T) {
+	t.Run("followExternalSymlinks keeps staging protected", func(t *testing.T) {
 		u := &User{Username: "u", Password: "p", Scope: "data"}
 		if err := u.Clean(base, true); err != nil {
 			t.Fatal(err)
 		}
-		if _, ok := u.Fs.(*afero.BasePathFs); !ok {
-			t.Fatalf("expected *afero.BasePathFs, got %T", u.Fs)
+		if files.BasePath(u.Fs) == nil {
+			t.Fatalf("expected scoped filesystem, got %T", u.Fs)
 		}
 		if got := u.FullPath("/x"); got != want {
 			t.Fatalf("FullPath: got %q, want %q", got, want)

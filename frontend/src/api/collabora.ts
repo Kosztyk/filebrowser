@@ -48,7 +48,10 @@ export async function openPath(path: string): Promise<CollaboraOpenResponse> {
   }
 
   const params = new URLSearchParams({ path });
-  return fetchJSON<CollaboraOpenResponse>(`/api/collabora/open?${params.toString()}`, {
-    method: "GET",
-  });
+  return fetchJSON<CollaboraOpenResponse>(
+    `/api/collabora/open?${params.toString()}`,
+    {
+      method: "GET",
+    }
+  );
 }

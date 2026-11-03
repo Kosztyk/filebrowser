@@ -19,16 +19,17 @@ import (
 // newTusTestServer mounts the TUS handlers behind a real HTTP server, under the
 // same "/api/tus" prefix used in production, so tests exercise connection
 // handling and header round-tripping instead of a bare ResponseRecorder.
-func newTusTestServer(t *testing.T, st *storage.Storage, cache UploadCache) *httptest.Server {
+func newTusTestServer(t *testing.T, st *storage.Storage, manager *UploadManager) *httptest.Server {
 	t.Helper()
 
 	server := &settings.Server{}
-	post := handle(tusPostHandler(cache), "/api/tus", st, server)
-	head := handle(tusHeadHandler(cache), "/api/tus", st, server)
-	patch := handle(tusPatchHandler(cache), "/api/tus", st, server)
+	post := handle(tusPostHandler(manager), "/api/tus", st, server)
+	head := handle(tusHeadHandler(manager), "/api/uploads", st, server)
+	patch := handle(tusPatchHandler(manager), "/api/uploads", st, server)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/tus/", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/api/tus/", post)
+	mux.HandleFunc("/api/uploads/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
 			post.ServeHTTP(w, r)
@@ -51,6 +52,7 @@ type tusTestFixture struct {
 	srv    *httptest.Server
 	client *http.Client
 	token  string
+	mgr    *UploadManager
 	scope  string
 }
 
@@ -67,15 +69,18 @@ func newTusTestFixture(t *testing.T) *tusTestFixture {
 	perm := users.Permissions{Create: true, Modify: true}
 	st := scopedUserStorage(t, userScope, perm, key)
 
-	cache := newMemoryUploadCache()
-	t.Cleanup(cache.Close)
-
-	srv := newTusTestServer(t, st, cache)
+	manager, err := NewUploadManager(filepath.Join(t.TempDir(), "uploads.db"), st, &settings.Server{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(manager.Close)
+	srv := newTusTestServer(t, st, manager)
 	return &tusTestFixture{
 		srv:    srv,
 		client: srv.Client(),
 		token:  signToken(t, perm, key),
 		scope:  userScope,
+		mgr:    manager,
 	}
 }
 
@@ -170,6 +175,7 @@ func TestTusMultiChunkUpload(t *testing.T) {
 		offset = end
 	}
 
+	f.mgr.processOne()
 	got, err := os.ReadFile(filepath.Join(f.scope, "movie.bin"))
 	if err != nil {
 		t.Fatalf("read uploaded file: %v", err)
@@ -259,6 +265,7 @@ func TestTusPatchRejectionKeepsConnectionUsable(t *testing.T) {
 		t.Fatal("connection was dropped by the rejected PATCH instead of being reused")
 	}
 
+	f.mgr.processOne()
 	got, err := os.ReadFile(filepath.Join(f.scope, "conflict.bin"))
 	if err != nil {
 		t.Fatalf("read uploaded file: %v", err)

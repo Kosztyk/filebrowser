@@ -1,6 +1,6 @@
 # Building File Browser
 
-This project is archived on 2026-09-01. Pull requests are not accepted and no further changes are merged. This document is kept as build documentation for anyone wishing to build the project from source.
+This custom source bundle updates the archived upstream project and preserves its custom integrations. Use Node.js 26.13.0, pnpm 12.16.1, Go 1.27.3, and Task 3.54.0. See [docs/INSTALL_3.3.1.md](docs/INSTALL_3.3.1.md) for current installation/upgrade; [UPGRADE_NOTES.md](UPGRADE_NOTES.md) is a historical 3.1.x report.
 
 ## Project Structure
 
@@ -12,7 +12,7 @@ The backend side of the application is written in [Go](https://golang.org/), whi
 We encourage you to use git to manage your fork. To clone the main repository, just run:
 
 ```bash
-git clone https://github.com/filebrowser/filebrowser
+git clone https://github.com/Kosztyk/filebrowser.git
 ```
 
 We use [Taskfile](https://taskfile.dev/) to manage the different processes (building, releasing, etc) automatically.
@@ -38,7 +38,7 @@ We use [Node.js](https://nodejs.org/en/) on the frontend to manage the build pro
 cd frontend
 
 # Install the dependencies
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
 If you just want to develop the backend, you can create a static build of the frontend:
@@ -75,7 +75,15 @@ go run .
 
 ## Documentation
 
-Documentation lives in [`docs`](docs) as plain Markdown and is no longer built into a site. The command line reference in [`docs/cli`](docs/cli) is generated from the commands themselves:
+Documentation lives in [`docs`](docs) as plain Markdown. The optional site in `www/` is built with Python 3.15.0:
+
+```bash
+python -m venv .venv
+.venv/bin/python -m pip install --require-hashes -r www/requirements.txt
+.venv/bin/python -m mkdocs build --strict --config-file www/mkdocs.yml
+```
+
+ The command line reference in [`docs/cli`](docs/cli) is generated from the commands themselves:
 
 ```bash
 task docs:cli:generate

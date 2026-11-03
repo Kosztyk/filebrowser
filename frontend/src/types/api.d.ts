@@ -1,19 +1,17 @@
 type ApiMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 type ApiContent =
-  | Blob
-  | File
-  | Pick<ReadableStreamDefaultReader<any>, "read">
-  | "";
+  Blob | File | Pick<ReadableStreamDefaultReader<any>, "read"> | "";
 
 interface ApiOpts {
   method?: ApiMethod;
-  headers?: object;
+  headers?: Record<string, string>;
   body?: any;
   signal?: AbortSignal;
 }
 
 interface TusSettings {
+  concurrentUploads?: number;
   retryCount: number;
   chunkSize: number;
 }

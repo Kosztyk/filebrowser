@@ -1,0 +1,19 @@
+?   	github.com/filebrowser/filebrowser/v2	[no test files]
+ok  	github.com/filebrowser/filebrowser/v2/auth	(cached)
+ok  	github.com/filebrowser/filebrowser/v2/cmd	1.136s
+ok  	github.com/filebrowser/filebrowser/v2/diskcache	(cached)
+?   	github.com/filebrowser/filebrowser/v2/errors	[no test files]
+ok  	github.com/filebrowser/filebrowser/v2/files	(cached)
+ok  	github.com/filebrowser/filebrowser/v2/fileutils	(cached)
+?   	github.com/filebrowser/filebrowser/v2/frontend	[no test files]
+ok  	github.com/filebrowser/filebrowser/v2/http	11.895s
+ok  	github.com/filebrowser/filebrowser/v2/img	(cached)
+ok  	github.com/filebrowser/filebrowser/v2/rules	(cached)
+ok  	github.com/filebrowser/filebrowser/v2/runner	(cached)
+?   	github.com/filebrowser/filebrowser/v2/search	[no test files]
+ok  	github.com/filebrowser/filebrowser/v2/settings	(cached)
+?   	github.com/filebrowser/filebrowser/v2/share	[no test files]
+?   	github.com/filebrowser/filebrowser/v2/storage	[no test files]
+ok  	github.com/filebrowser/filebrowser/v2/storage/bolt	(cached)
+ok  	github.com/filebrowser/filebrowser/v2/users	(cached)
+?   	github.com/filebrowser/filebrowser/v2/version	[no test files]

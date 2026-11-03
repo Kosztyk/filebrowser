@@ -9,7 +9,7 @@ import (
 
 func contentSecurityPolicy(cfg settings.Collabora) string {
 	if !cfg.Enabled || strings.TrimSpace(cfg.URL) == "" {
-		return `default-src 'self'; style-src 'unsafe-inline';`
+		return `default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; media-src 'self' blob:; frame-src 'self' blob:;`
 	}
 
 	origins := collaboraCSPOrigins(cfg.URL)
@@ -19,7 +19,9 @@ func contentSecurityPolicy(cfg settings.Collabora) string {
 		"script-src 'self'",
 		"img-src 'self' data: blob:",
 		"font-src 'self' data:",
-		"frame-src 'self' " + strings.Join(origins, " "),
+		"worker-src 'self' blob:",
+		"media-src 'self' blob:",
+		"frame-src 'self' blob: " + strings.Join(origins, " "),
 		"connect-src 'self' " + strings.Join(origins, " "),
 	}
 

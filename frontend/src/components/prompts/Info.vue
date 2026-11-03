@@ -29,10 +29,12 @@
 
       <template v-if="dir && selected.length === 0">
         <p>
-          <strong>{{ $t("prompts.numberFiles") }}:</strong> {{ req.numFiles }}
+          <strong>{{ $t("prompts.numberFiles") }}:</strong>
+          {{ req.page?.numFiles ?? req.numFiles }}
         </p>
         <p>
-          <strong>{{ $t("prompts.numberDirs") }}:</strong> {{ req.numDirs }}
+          <strong>{{ $t("prompts.numberDirs") }}:</strong>
+          {{ req.page?.numDirs ?? req.numDirs }}
         </p>
       </template>
 
@@ -82,6 +84,7 @@
           >
         </p>
       </template>
+      <PreviousVersions />
     </div>
 
     <div class="card-action">
@@ -100,6 +103,7 @@
 </template>
 
 <script>
+import PreviousVersions from "@/components/files/PreviousVersions.vue";
 import { mapActions, mapState } from "pinia";
 import { useFileStore } from "@/stores/file";
 import { useLayoutStore } from "@/stores/layout";
@@ -108,6 +112,7 @@ import dayjs from "dayjs";
 import { files as api } from "@/api";
 
 export default {
+  components: { PreviousVersions },
   name: "info",
   inject: ["$showError"],
   computed: {

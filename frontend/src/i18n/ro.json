@@ -72,7 +72,41 @@
     "downloadSelected": "Download Selected"
   },
   "upload": {
-    "abortUpload": "Are you sure you wish to abort?"
+    "abortUpload": "Are you sure you wish to abort?",
+    "transfers": "Transfers",
+    "transferred": "transferred",
+    "clearCompleted": "Clear completed history",
+    "cancelUnfinished": "Cancel unfinished uploads",
+    "toggleList": "Show or hide transfers",
+    "pause": "Pause",
+    "resume": "Resume",
+    "selectOriginal": "Select original file",
+    "retryProcessing": "Retry processing",
+    "cancel": "Cancel",
+    "states": {
+      "queued": "Queued",
+      "uploading": "Uploading",
+      "pausing": "Pausing",
+      "paused": "Paused",
+      "needs_file": "Select original file to resume",
+      "received": "Received; waiting for processing",
+      "scanning": "Scanning",
+      "committing": "Publishing",
+      "ready": "Ready",
+      "failed": "Failed",
+      "infected": "Blocked: infected",
+      "cancelled": "Cancelled",
+      "expired": "Expired"
+    },
+    "scan": {
+      "pending": "Scan pending",
+      "clean": "Scan: clean",
+      "disabled": "Scanning disabled",
+      "skipped": "Scan skipped by size policy",
+      "infected": "Scan: infected",
+      "unknown": "Scan result unknown",
+      "error": "Scan failed"
+    }
   },
   "errors": {
     "forbidden": "Nu ai permisiuni sa accesezi asta.",

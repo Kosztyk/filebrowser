@@ -1,0 +1,19 @@
+test_failed_start_restores_the_previous_binary_and_database (test_install.NativeInstallerTests.test_failed_start_restores_the_previous_binary_and_database) ... ok
+test_fresh_restore_uses_the_new_packaged_executable (test_install.NativeInstallerTests.test_fresh_restore_uses_the_new_packaged_executable) ... ok
+test_keep_existing_refuses_archive_hardlink_into_data (test_install.NativeInstallerTests.test_keep_existing_refuses_archive_hardlink_into_data) ... ok
+test_keep_existing_refuses_archive_symlink_into_data (test_install.NativeInstallerTests.test_keep_existing_refuses_archive_symlink_into_data) ... ok
+test_keep_existing_refuses_checksum_failure_before_extraction (test_install.NativeInstallerTests.test_keep_existing_refuses_checksum_failure_before_extraction) ... ok
+test_keep_existing_refuses_data_subtree_and_ancestor_archive_roots (test_install.NativeInstallerTests.test_keep_existing_refuses_data_subtree_and_ancestor_archive_roots) ... ok
+test_keep_existing_refuses_existing_application_database (test_install.NativeInstallerTests.test_keep_existing_refuses_existing_application_database) ... ok
+test_keep_existing_refuses_full_backup_before_extraction (test_install.NativeInstallerTests.test_keep_existing_refuses_full_backup_before_extraction) ... ok
+test_keep_existing_refuses_symbolic_data_root (test_install.NativeInstallerTests.test_keep_existing_refuses_symbolic_data_root) ... ok
+test_keep_existing_state_restore_never_enumerates_or_creates_data (test_install.NativeInstallerTests.test_keep_existing_state_restore_never_enumerates_or_creates_data) ... ok
+test_replacement_failure_restarts_original (test_install.NativeInstallerTests.test_replacement_failure_restarts_original) ... ok
+test_state_restore_still_refuses_existing_data_without_explicit_flag (test_install.NativeInstallerTests.test_state_restore_still_refuses_existing_data_without_explicit_flag) ... ok
+test_stopped_service_remains_stopped (test_install.NativeInstallerTests.test_stopped_service_remains_stopped) ... ok
+test_upgrade_preserves_database_and_restarts_running_test_service (test_install.NativeInstallerTests.test_upgrade_preserves_database_and_restarts_running_test_service) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.148s
+
+OK

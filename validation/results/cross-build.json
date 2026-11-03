@@ -1,0 +1,86 @@
+[
+  {
+    "os": "linux",
+    "arch": "amd64",
+    "arm": null,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "os": "linux",
+    "arch": "arm64",
+    "arm": null,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "os": "linux",
+    "arch": "arm",
+    "arm": "6",
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "os": "linux",
+    "arch": "arm",
+    "arm": "7",
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "os": "linux",
+    "arch": "386",
+    "arm": null,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "os": "linux",
+    "arch": "riscv64",
+    "arm": null,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "os": "windows",
+    "arch": "amd64",
+    "arm": null,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "os": "windows",
+    "arch": "arm64",
+    "arm": null,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "os": "darwin",
+    "arch": "amd64",
+    "arm": null,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "os": "darwin",
+    "arch": "arm64",
+    "arm": null,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "os": "freebsd",
+    "arch": "amd64",
+    "arm": null,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "os": "openbsd",
+    "arch": "amd64",
+    "arm": null,
+    "exit": 0,
+    "output": ""
+  }
+]

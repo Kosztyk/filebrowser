@@ -1,0 +1,9 @@
+src/api/tus.ts 192ms
+src/api/files.ts 76ms
+src/stores/upload.ts 57ms
+src/components/prompts/UploadFiles.vue 175ms
+src/types/upload.d.ts 5ms
+src/types/api.d.ts 5ms
+src/types/settings.d.ts 8ms
+src/views/settings/Global.vue 207ms
+src/api/__tests__/tus.test.ts 29ms

@@ -1,0 +1,10 @@
+{
+  "version": "3.3.1",
+  "build_id": "directory-fix",
+  "base_archive_sha256": "63bd6df9a8578f2dc25f2a85f6b728ba6433c8ee4509c5c12ced29262d5912ee",
+  "binaries": {
+    "linux-arm64/filebrowser": "800e7a44d07ba4aa721d4ebb9ce580a3df6e821aa487dc574b56f43954b260c6",
+    "linux-amd64/filebrowser": "674beb2a3826403775175e7f0558ac03c1eb5eb3708fc99ffb32f652c8c8f968"
+  },
+  "source_tree_sha256": "2f33b883bb21e742eba87bfe8be41033d8498d75a4f24855ef9a6837f8a23fa1"
+}

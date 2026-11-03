@@ -177,6 +177,14 @@ var sharePostHandler = withPermShare(func(w http.ResponseWriter, r *http.Request
 	}
 
 	if d.settings.Erugo.Enabled {
+		if d.features != nil && !strings.EqualFold(r.URL.Query().Get("sync"), "true") {
+			j, e := d.features.submit(d, "erugo", erugoWork{cleanFileBrowserPath(r.URL.Path), body}, nil)
+			if e != nil {
+				return errToStatus(e), e
+			}
+			w.WriteHeader(http.StatusAccepted)
+			return renderJSON(w, r, map[string]any{"jobId": j.ID, "status": "running", "external": true})
+		}
 		externalShare, err := createErugoShare(r.Context(), d, r.URL.Path, body)
 		if err != nil {
 			if status := erugoUpstreamStatus(err); status != 0 {

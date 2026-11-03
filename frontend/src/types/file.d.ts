@@ -1,4 +1,17 @@
+interface DirectoryPage {
+  snapshot: string;
+  offset: number;
+  limit: number;
+  total: number;
+  numDirs?: number;
+  numFiles?: number;
+  filter: string;
+  sort: string;
+  asc: boolean;
+  expires: string;
+}
 interface ResourceBase {
+  pageVisible?: boolean;
   path: string;
   name: string;
   size: number;
@@ -15,6 +28,7 @@ interface ResourceBase {
 }
 
 interface Resource extends ResourceBase {
+  page?: DirectoryPage;
   items: ResourceItem[];
   numDirs: number;
   numFiles: number;
@@ -44,14 +58,7 @@ type ResourceType =
   | "textImmutable";
 
 type DownloadFormat =
-  | "zip"
-  | "tar"
-  | "targz"
-  | "tarbz2"
-  | "tarxz"
-  | "tarlz4"
-  | "tarsz"
-  | null;
+  "zip" | "tar" | "targz" | "tarbz2" | "tarxz" | "tarlz4" | "tarsz" | null;
 
 interface ClipItem {
   from: string;
@@ -92,7 +99,6 @@ interface RecursiveEntry {
   modified: string;
   isDir: boolean;
 }
-
 
 interface ClamAVPathScanResponse {
   jobId?: string;

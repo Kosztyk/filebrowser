@@ -128,4 +128,8 @@ app.provide("$showError", (error: Error | string, displayReport = true) => {
   );
 });
 
-router.isReady().then(() => app.mount("#app"));
+import { keepSessionAlive } from "@/utils/auth";
+router.isReady().then(() => {
+  app.mount("#app");
+  keepSessionAlive();
+});

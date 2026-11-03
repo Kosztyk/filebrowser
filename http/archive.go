@@ -229,7 +229,7 @@ func buildArchiveResource(ctx context.Context, archivePath, inner string, d *dat
 	if err != nil {
 		return nil, err
 	}
-	defer opened.close()
+	defer func() { _ = opened.close() }()
 
 	target, err := cleanArchiveInnerPath(inner)
 	if err != nil {
@@ -240,7 +240,7 @@ func buildArchiveResource(ctx context.Context, archivePath, inner string, d *dat
 	var exact *files.FileInfo
 	hasChildren := target == "."
 
-	err = opened.extractor.Extract(ctx, opened.stream, func(ctx context.Context, entry archives.FileInfo) error {
+	err = opened.extractor.Extract(ctx, opened.stream, func(_ context.Context, entry archives.FileInfo) error {
 		entryPath, cleanErr := archiveEntryPath(entry.NameInArchive)
 		if cleanErr != nil || entryPath == "." {
 			return nil
@@ -347,11 +347,11 @@ func buildArchiveResource(ctx context.Context, archivePath, inner string, d *dat
 		child.ArchivePath = archivePath
 		child.ArchiveInnerPath = child.Path
 		if child.IsDir {
-			root.Listing.NumDirs++
+			root.NumDirs++
 		} else {
-			root.Listing.NumFiles++
+			root.NumFiles++
 		}
-		root.Listing.Items = append(root.Listing.Items, child)
+		root.Items = append(root.Items, child)
 	}
 
 	root.Sorting = d.user.Sorting
@@ -393,15 +393,15 @@ var archiveRawHandler = withUser(func(w http.ResponseWriter, r *http.Request, d 
 	if err != nil {
 		return errToStatus(err), err
 	}
-	defer opened.close()
+	defer func() { _ = opened.close() }()
 
-	err = opened.extractor.Extract(r.Context(), opened.stream, func(ctx context.Context, entry archives.FileInfo) error {
+	err = opened.extractor.Extract(r.Context(), opened.stream, func(_ context.Context, entry archives.FileInfo) error {
 		entryPath, cleanErr := archiveEntryPath(entry.NameInArchive)
 		if cleanErr != nil || entryPath != inner {
 			return nil
 		}
 
-		if entry.FileInfo != nil && entry.FileInfo.IsDir() {
+		if entry.FileInfo != nil && entry.IsDir() {
 			return fberrors.ErrIsDirectory
 		}
 		if entry.Open == nil {
@@ -428,8 +428,8 @@ var archiveRawHandler = withUser(func(w http.ResponseWriter, r *http.Request, d 
 		w.Header().Add("Content-Security-Policy", `script-src 'none';`)
 		w.Header().Set("Cache-Control", "private")
 
-		if entry.FileInfo != nil && entry.FileInfo.Size() >= 0 {
-			w.Header().Set("Content-Length", fmt.Sprintf("%d", entry.FileInfo.Size()))
+		if entry.FileInfo != nil && entry.Size() >= 0 {
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", entry.Size()))
 		}
 
 		if _, copyErr := io.Copy(w, f); copyErr != nil {
@@ -483,6 +483,14 @@ var archiveExtractHandler = withUser(func(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	if d.features != nil && !strings.EqualFold(r.URL.Query().Get("sync"), "true") {
+		j, e := d.features.submit(d, "extract", extractionWork{archivePath, inner, destination, r.URL.Query().Get("override") == "true"}, nil)
+		if e != nil {
+			return errToStatus(e), e
+		}
+		w.WriteHeader(http.StatusAccepted)
+		return renderJSON(w, r, map[string]any{"jobId": j.ID, "status": "running", "destination": destination})
+	}
 	response := archiveExtractResponse{Destination: destination}
 	err = d.RunHook(func() error {
 		extracted, extractErr := extractArchiveTo(r.Context(), d, archivePath, inner, destination, r.URL.Query().Get("override") == "true")
@@ -497,28 +505,36 @@ var archiveExtractHandler = withUser(func(w http.ResponseWriter, r *http.Request
 })
 
 func extractArchiveTo(ctx context.Context, d *data, archivePath, inner, destination string, override bool) (int, error) {
+	limits := d.settings.Work.Effective()
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(limits.ArchiveSeconds)*time.Second)
+	defer cancel()
+	budget := &extractionBudget{ctx: ctx, limits: limits, d: d}
 	opened, err := openArchive(ctx, archivePath, d)
 	if err != nil {
 		return 0, err
 	}
-	defer opened.close()
+	defer func() { _ = opened.close() }()
 
 	extracted := 0
 	found := inner == "."
 
-	err = opened.extractor.Extract(ctx, opened.stream, func(ctx context.Context, entry archives.FileInfo) error {
+	err = opened.extractor.Extract(ctx, opened.stream, func(_ context.Context, entry archives.FileInfo) error {
+		if err := budget.entry(entry.NameInArchive); err != nil {
+			return err
+		}
 		entryPath, cleanErr := archiveEntryPath(entry.NameInArchive)
 		if cleanErr != nil || entryPath == "." {
 			return nil
 		}
 
 		rel := ""
-		if inner == "." {
+		switch {
+		case inner == ".":
 			rel = entryPath
-		} else if entryPath == inner {
+		case entryPath == inner:
 			found = true
 			rel = gopath.Base(entryPath)
-		} else {
+		default:
 			prefix := inner + "/"
 			if !strings.HasPrefix(entryPath, prefix) {
 				return nil
@@ -546,8 +562,8 @@ func extractArchiveTo(ctx context.Context, d *data, archivePath, inner, destinat
 		mode := os.FileMode(0)
 		entryIsDir := strings.HasSuffix(strings.ReplaceAll(entry.NameInArchive, "\\", "/"), "/")
 		if entry.FileInfo != nil {
-			mode = entry.FileInfo.Mode()
-			entryIsDir = entryIsDir || entry.FileInfo.IsDir()
+			mode = entry.Mode()
+			entryIsDir = entryIsDir || entry.IsDir()
 		}
 		if mode&os.ModeSymlink != 0 || mode&os.ModeIrregular != 0 || mode&os.ModeNamedPipe != 0 || mode&os.ModeDevice != 0 {
 			return nil
@@ -560,6 +576,12 @@ func extractArchiveTo(ctx context.Context, d *data, archivePath, inner, destinat
 			return nil
 		}
 
+		if done, e := extractAlreadyPublished(ctx, d, target); e != nil {
+			return e
+		} else if done {
+			extracted++
+			return nil
+		}
 		if !override {
 			if _, err := d.user.Fs.Stat(target); err == nil {
 				return os.ErrExist
@@ -577,10 +599,11 @@ func extractArchiveTo(ctx context.Context, d *data, archivePath, inner, destinat
 		}
 		defer f.Close()
 
-		if _, err := writeFile(d.user.Fs, target, f, d.settings.FileMode, d.settings.DirMode); err != nil {
+		if err := writeExtracted(ctx, d, target, extractionReader{budget, f, target}); err != nil {
 			return err
 		}
 		extracted++
+		reportJobProgress(ctx, 1, 0)
 		return nil
 	})
 	if err != nil {

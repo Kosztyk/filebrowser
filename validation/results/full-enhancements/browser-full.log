@@ -1,0 +1,9 @@
+PASS pagination, viewport virtualization, cross-page selection and lazy EPUB loading
+PASS server-side filtering
+PASS bounded CSV paging and metadata-only loading
+PASS bounded log window
+PASS TIFF decoded in a worker
+PASS previous contents API
+PASS durable prepared ZIP, range download and ETag
+PASS About/System, sessions, diagnostics and limits UI
+PASS no browser runtime errors

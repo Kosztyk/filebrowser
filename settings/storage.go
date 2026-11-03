@@ -137,6 +137,7 @@ func (s *Storage) Get() (*Settings, error) {
 		set.Erugo.UploadTimeout = "2h"
 	}
 
+	NormalizeTransfers(&set.Tus, &set.ClamAV)
 	return set, nil
 }
 

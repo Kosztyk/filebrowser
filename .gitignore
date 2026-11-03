@@ -10,6 +10,8 @@ rice-box.go
 
 .DS_Store
 node_modules
+frontend/test-results/
+frontend/playwright-report/
 
 # local env files
 .env.local
@@ -37,3 +39,13 @@ build/
 
 default.nix
 Dockerfile.dev
+
+# Runtime secrets, local databases and build artifacts
+.env
+.env.*
+!.env.example
+**/*.db.uploads.db
+**/*.db.uploads.db.artifacts/
+# Prebuilt executables are distributed in release ZIPs, not source Git history.
+/native-install/linux-amd64/filebrowser
+/native-install/linux-arm64/filebrowser

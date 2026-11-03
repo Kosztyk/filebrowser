@@ -1,0 +1,13 @@
+test_backup_of_stopped_service_leaves_it_stopped (test_migration.MigrationTests.test_backup_of_stopped_service_leaves_it_stopped) ... ok
+test_corrupt_backup_is_rejected_before_restore (test_migration.MigrationTests.test_corrupt_backup_is_rejected_before_restore) ... ok
+test_existing_installation_is_not_overwritten (test_migration.MigrationTests.test_existing_installation_is_not_overwritten) ... ok
+test_failed_archive_restarts_original_service (test_migration.MigrationTests.test_failed_archive_restarts_original_service) ... ok
+test_full_round_trip_and_private_file_permissions (test_migration.MigrationTests.test_full_round_trip_and_private_file_permissions) ... ok
+test_insufficient_space_is_rejected_before_stopping_service (test_migration.MigrationTests.test_insufficient_space_is_rejected_before_stopping_service) ... ok
+test_state_only_is_explicit_and_creates_empty_test_data_directory (test_migration.MigrationTests.test_state_only_is_explicit_and_creates_empty_test_data_directory) ... ok
+test_symlinked_data_root_includes_its_actual_contents (test_migration.MigrationTests.test_symlinked_data_root_includes_its_actual_contents) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.336s
+
+OK

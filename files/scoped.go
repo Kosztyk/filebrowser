@@ -2,6 +2,7 @@ package files
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -17,7 +18,10 @@ import (
 // confinement — and adds a per-operation scope check on every call that would
 // dereference a symlink at the OS layer (open, stat, lstat, chmod, …).
 type ScopedFs struct {
-	base *afero.BasePathFs
+	base           *afero.BasePathFs
+	private        bool
+	lease          string
+	followExternal bool
 }
 
 var (
@@ -37,14 +41,11 @@ func NewScopedFs(source afero.Fs, path string) *ScopedFs {
 	return &ScopedFs{base: afero.NewBasePathFs(source, path).(*afero.BasePathFs)}
 }
 
-// NewFs builds a user filesystem rooted at path. When followExternal is true it
-// returns a bare BasePathFs, so symlinks whose target resolves outside the scope
-// are followed; otherwise it returns a ScopedFs that refuses to follow them.
+// NewFs keeps private staging protected even when external symlinks are enabled.
 func NewFs(source afero.Fs, path string, followExternal bool) afero.Fs {
-	if followExternal {
-		return afero.NewBasePathFs(source, path)
-	}
-	return NewScopedFs(source, path)
+	s := NewScopedFs(source, path)
+	s.followExternal = followExternal
+	return s
 }
 
 // BasePath returns the underlying *afero.BasePathFs of a user filesystem built
@@ -72,6 +73,9 @@ func (s *ScopedFs) RealPath(name string) (string, error) {
 
 // guard returns an error if name's on-disk target resolves outside the scope.
 func (s *ScopedFs) guard(name string) error {
+	if !s.private && IsPrivatePath(name) {
+		return os.ErrPermission
+	}
 	ok, err := s.within(name)
 	if err != nil {
 		return err
@@ -153,7 +157,10 @@ func (s *ScopedFs) within(p string) (bool, error) {
 		prefix += string(filepath.Separator)
 	}
 
-	return resolved == root || strings.HasPrefix(resolved, prefix), nil
+	if !s.private && IsPrivatePath(resolved) {
+		return false, nil
+	}
+	return s.followExternal || resolved == root || strings.HasPrefix(resolved, prefix), nil
 }
 
 func (s *ScopedFs) Create(name string) (afero.File, error) {
@@ -181,14 +188,22 @@ func (s *ScopedFs) Open(name string) (afero.File, error) {
 	if err := s.guard(name); err != nil {
 		return nil, err
 	}
-	return s.base.Open(name)
+	f, err := s.base.Open(name)
+	if err != nil || s.private {
+		return f, err
+	}
+	return &privateFilteredFile{File: f}, nil
 }
 
 func (s *ScopedFs) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
 	if err := s.guard(name); err != nil {
 		return nil, err
 	}
-	return s.base.OpenFile(name, flag, perm)
+	f, err := s.base.OpenFile(name, flag, perm)
+	if err != nil || s.private {
+		return f, err
+	}
+	return &privateFilteredFile{File: f}, nil
 }
 
 func (s *ScopedFs) Remove(name string) error {
@@ -250,4 +265,40 @@ func (s *ScopedFs) LstatIfPossible(name string) (os.FileInfo, bool, error) {
 		return nil, false, err
 	}
 	return s.base.LstatIfPossible(name)
+}
+
+// Private directory entries never enter user listings or recursive walks.
+type privateFilteredFile struct{ afero.File }
+
+func (f *privateFilteredFile) Readdir(n int) ([]os.FileInfo, error) {
+	out := []os.FileInfo{}
+	for {
+		request := n
+		if n > 0 {
+			request = n - len(out)
+		}
+		entries, e := f.File.Readdir(request)
+		for _, i := range entries {
+			if !IsPrivatePath(i.Name()) {
+				out = append(out, i)
+			}
+		}
+		if e != nil {
+			if e == io.EOF && len(out) > 0 {
+				return out, nil
+			}
+			return out, e
+		}
+		if n <= 0 || len(out) >= n {
+			return out, nil
+		}
+	}
+}
+func (f *privateFilteredFile) Readdirnames(n int) ([]string, error) {
+	entries, e := f.Readdir(n)
+	names := make([]string, len(entries))
+	for i, v := range entries {
+		names[i] = v.Name()
+	}
+	return names, e
 }

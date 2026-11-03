@@ -1,14 +1,22 @@
+> **Current fork documentation:** For File Browser **3.3.1**, use [README](../README.md) and [installation/upgrade](INSTALL_3.3.1.md), plus [integrations](INTEGRATIONS_3.3.1.md). Material below is retained as historical/underlying reference and may describe earlier versions.
+
 <p align="center">
   <img src="../branding/banner.png" width="550"/>
 </p>
 
 > [!WARNING]
 >
-> **File Browser is archived on 2026-09-01.** There will be no further releases and no security fixes. Existing releases and Docker images stay online. For the known unaddressed security issues and hardening guidance, read the [README](../README.md#security).
+> **Upstream File Browser was archived on 2026-09-01.** This is a separately maintained fork; assess its security independently. Existing releases and Docker images stay online. For the known unaddressed security issues and hardening guidance, read the [README](../README.md#security).
 
 File Browser provides a file managing interface within a specified directory and it can be used to upload, delete, preview and edit your files. It is a **create-your-own-cloud**-kind of software where you can just install it on your server, direct it to a path and access your files through a nice web interface.
 
 ![Preview](static/example.gif)
+
+## Custom 3.3.1 features and deployment
+
+- [Install / upgrade 3.3.1](INSTALL_3.3.1.md)
+- [Erugo, ConvertX, ClamAV and Collabora integrations](INTEGRATIONS_3.3.1.md)
+- [Release notes and feature inventory](../CHANGELOG_CUSTOM.md)
 
 ## Contents
 

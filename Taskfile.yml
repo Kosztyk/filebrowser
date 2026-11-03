@@ -11,12 +11,12 @@ tasks:
   build:backend:
     desc: Build backend binary
     cmds:
-      - go build -ldflags='-s -w -X "github.com/filebrowser/filebrowser/v2/version.Version={{.VERSION}}" -X "github.com/filebrowser/filebrowser/v2/version.CommitSHA={{.GIT_COMMIT}}"' -o filebrowser .
+      - go build -buildvcs=false -ldflags='-s -w -X "github.com/filebrowser/filebrowser/v2/version.Version={{.VERSION}}" -X "github.com/filebrowser/filebrowser/v2/version.CommitSHA={{.GIT_COMMIT}}"' -o filebrowser .
     vars:
       GIT_COMMIT:
-        sh: git log -n 1 --format=%h
+        sh: git log -n 1 --format=%h 2>/dev/null || echo source-archive
       VERSION:
-        sh: git describe --tags --abbrev=0 --match=v* | cut -c 2-
+        sh: cat VERSION
 
   build:
     desc: Build both frontend and backend
@@ -28,12 +28,12 @@ tasks:
     internal: true
     prompt: Do you wish to proceed?
     cmds:
-      - pnpm dlx commit-and-tag-version -s
+      - pnpm dlx commit-and-tag-version@13.3.0 -s
 
   release:dry-run:
     internal: true
     cmds:
-      - pnpm dlx commit-and-tag-version --dry-run --skip
+      - pnpm dlx commit-and-tag-version@13.3.0 --dry-run --skip
 
   release:
     desc: Create a new release

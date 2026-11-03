@@ -1,3 +1,5 @@
+> **Current fork documentation:** For File Browser **3.3.1**, use [README](../README.md) and [installation/upgrade](INSTALL_3.3.1.md), plus [integrations](INTEGRATIONS_3.3.1.md). Material below is retained as historical/underlying reference and may describe earlier versions.
+
 ## Self-Registration (Signup)
 
 File Browser allows you to enable user self-registration (signup). This can be enabled via **Settings → Global Settings**, or with `filebrowser config set --signup`. Self-registered users inherit the configured **user defaults**, including the scope.

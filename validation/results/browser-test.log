@@ -1,0 +1,13 @@
+$ playwright test
+[WebServer] (node:81) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 3 tests using 1 worker
+
+(node:125) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › tests/browser/compatibility.spec.ts:3:1 › Video.js 10 plays media and exposes captions, speed and fullscreen controls (3.8s)
+  ✓  2 [chromium] › tests/browser/compatibility.spec.ts:67:1 › Vue Reader renders a zipped EPUB and reports its CFI location (1.4s)
+  ✓  3 [chromium] › tests/browser/compatibility.spec.ts:79:1 › browser math preview is sanitized and retains MathML (1.4s)
+
+  3 passed (11.7s)

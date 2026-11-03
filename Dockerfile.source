@@ -1,0 +1,44 @@
+# Build the customized application from this source tree.
+FROM --platform=$BUILDPLATFORM node:26.13.0-alpine3.24@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS frontend
+WORKDIR /src/frontend
+RUN npm install --global pnpm@12.16.1
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
+COPY frontend/patches/ ./patches/
+RUN pnpm install --frozen-lockfile
+COPY frontend/ ./
+RUN pnpm run build
+
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine3.24@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS backend
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+COPY --from=frontend /src/frontend/dist ./frontend/dist
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=${TARGETVARIANT#v} \
+    go build -buildvcs=false -trimpath -ldflags="-s -w -X github.com/filebrowser/filebrowser/v2/version.Version=$(cat VERSION)" -o /out/filebrowser .
+
+FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS fetcher
+RUN apk --no-cache add ca-certificates mailcap tini-static && \
+    wget -O /JSON.sh https://raw.githubusercontent.com/dominictarr/JSON.sh/0d5e5c77365f63809bf6e77ef44a1f34b0e05840/JSON.sh
+
+FROM busybox:1.38.0-musl@sha256:80e38f9a1b39188b8bdb28879178edb322a4402b081a9aedda1924609decd6f6
+ENV UID=1000 GID=1000
+RUN addgroup -g $GID user && adduser -D -u $UID -G user user
+COPY --from=backend --chown=user:user /out/filebrowser /bin/filebrowser
+COPY --chown=user:user docker/common/ /
+COPY --chown=user:user docker/alpine/ /
+COPY --from=fetcher /sbin/tini-static /bin/tini
+COPY --from=fetcher /JSON.sh /JSON.sh
+COPY --from=fetcher /etc/ca-certificates.conf /etc/ca-certificates.conf
+COPY --from=fetcher /etc/ca-certificates /etc/ca-certificates
+COPY --from=fetcher /etc/mime.types /etc/mime.types
+COPY --from=fetcher /etc/ssl /etc/ssl
+RUN mkdir -p /config /database /srv && chown -R user:user /config /database /srv && chmod +x /healthcheck.sh /init.sh
+HEALTHCHECK --start-period=2s --interval=5s --timeout=3s CMD /healthcheck.sh
+USER user
+VOLUME /srv /config /database
+EXPOSE 80
+ENTRYPOINT ["tini", "--", "/init.sh"]

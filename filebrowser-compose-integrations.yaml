@@ -1,0 +1,120 @@
+# Example only. Copy to repository root as compose.integrations.yaml or change build.context.
+# Required: populate an untracked .env (see .env.example) AND erugo.env separately.
+# For internet access use a TLS reverse proxy in front of FILEBROWSER/COLLABORA/ERUGO.
+name: filebrowser-integrations
+services:
+  filebrowser:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.source
+    image: filebrowser-custom:3.3.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    environment:
+      FB_ADDRESS: "0.0.0.0"
+      FB_PORT: "80"
+      FB_ROOT: /srv
+      FB_DATABASE: /database/filebrowser.db
+      FB_ERUGO_ENABLED: "true"
+      FB_ERUGO_URL: http://erugo:80
+      FB_ERUGO_API_KEY: ${ERUGO_API_TOKEN:?configure .env}
+      FB_ERUGO_REVERSE_SHARE_ENDPOINT: /api/integrations/filebrowser/reverse-share
+      FB_CONVERTX_ENABLED: "true"
+      FB_CONVERTX_URL: http://convertx:3000
+      FB_CONVERTX_API_KEY: ${CONVERTX_API_TOKEN:?configure .env}
+      CLAMAV_URL: http://clamav-rest-api:3000/api/v1/scan
+      FB_COLLABORA_ENABLED: "true"
+      FB_COLLABORA_URL: ${COLLABORA_PUBLIC_URL:?configure .env}
+      FB_COLLABORA_PUBLIC_URL: ${FILEBROWSER_PUBLIC_URL:?configure .env}
+      FB_COLLABORA_INTERNAL_URL: http://filebrowser:80
+      FB_COLLABORA_WOPI_SECRET: ${WOPI_SECRET:?configure .env}
+      FB_COLLABORA_TOKEN_TTL: 2h
+    volumes:
+      - fb-files:/srv
+      - fb-db:/database
+      - fb-config:/config
+    networks: [services]
+  erugo:
+    image: kosztyk/erugo:5th
+    restart: unless-stopped
+    env_file:
+      - path: ./erugo.env
+        required: true
+    environment:
+      CLAMAV_URL: http://clamav-rest-api:3000/api/v1/scan
+      CLAMAV_MAX_FILE_SIZE_BYTES: "1900000000"
+    volumes:
+      - erugo-data:/var/www/html/storage
+    ports:
+      - "127.0.0.1:9998:80"
+    networks: [services]
+  convertx:
+    image: kosztyk/convertx-clamav:v0.20.0
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Bucharest
+      HTTP_ALLOWED: "true" # LAN/container only; use HTTPS for public access
+      JWT_SECRET: ${CONVERTX_JWT_SECRET:?configure .env}
+      CONVERTX_API_TOKEN: ${CONVERTX_API_TOKEN:?configure .env}
+      AUTO_DELETE_EVERY_N_HOURS: "720"
+      CLAMAV_URL: http://clamav-rest-api:3000/api/v1/scan
+      ERUGO_BASE_URL: http://erugo:80
+      ERUGO_API_TOKEN: ${ERUGO_API_TOKEN:?configure .env}
+      ERUGO_DEFAULT_EXPIRY_HOURS: "168"
+    volumes:
+      - convertx-data:/app/data
+    ports:
+      - "127.0.0.1:8081:3000"
+    networks: [services]
+  clamav-rest-api:
+    image: kosztyk/clamav-rest-api:renovate
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      APP_FORM_KEY: FILES
+      CLAMD_IP: clamav
+      CLAMD_PORT: "3310"
+      APP_MAX_FILE_SIZE: "190"
+      APP_MAX_FILES_NUMBER: "5"
+      APP_TEMP_FILE_DIR: /tmp/clamav-uploads
+      APP_UPLOAD_TIMEOUT: "0"
+      APP_MAX_CONCURRENT_SCANS: "1"
+      CLAMD_TIMEOUT: "3600000"
+      APP_MORGAN_LOG_FORMAT: combined
+    volumes:
+      - clamav-upload-tmp:/tmp/clamav-uploads
+    networks: [services]
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    volumes:
+      - clamav-db:/var/lib/clamav
+    networks: [services]
+  collabora:
+    image: collabora/code:latest
+    restart: unless-stopped
+    environment:
+      server_name: ${COLLABORA_SERVER_NAME:?configure .env}
+      aliasgroup1: ${COLLABORA_ALIAS_PUBLIC:?configure .env}
+      aliasgroup2: ${COLLABORA_ALIAS_INTERNAL:?configure .env}
+      username: ${COLLABORA_ADMIN_USER:?configure .env}
+      password: ${COLLABORA_ADMIN_PASSWORD:?configure .env}
+    command:
+      - --o:ssl.enable=false
+      - --o:ssl.termination=true
+    ports:
+      - "127.0.0.1:9980:9980"
+    cap_add: [MKNOD]
+    networks: [services]
+networks:
+  services:
+    driver: bridge
+volumes:
+  fb-files:
+  fb-db:
+  fb-config:
+  erugo-data:
+  convertx-data:
+  clamav-upload-tmp:
+  clamav-db:

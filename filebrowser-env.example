@@ -1,0 +1,15 @@
+# COPY to .env, set unique random values, and NEVER commit .env.
+# Example: openssl rand -hex 32
+FILEBROWSER_PUBLIC_URL=https://files.example.com
+COLLABORA_PUBLIC_URL=https://office.example.com
+COLLABORA_SERVER_NAME=office.example.com
+# Collabora aliasgroup regex strings must match your actual domains.
+COLLABORA_ALIAS_PUBLIC=https://files\.example\.com:443
+COLLABORA_ALIAS_INTERNAL=http://filebrowser:80
+COLLABORA_ADMIN_USER=replace-me
+COLLABORA_ADMIN_PASSWORD=replace-with-long-random-value
+WOPI_SECRET=replace-with-long-random-value
+CONVERTX_JWT_SECRET=replace-with-long-random-value
+CONVERTX_API_TOKEN=replace-with-long-random-value
+ERUGO_API_TOKEN=replace-with-long-random-value
+# Provide an erugo.env with ERUGO configuration expected by your custom image.

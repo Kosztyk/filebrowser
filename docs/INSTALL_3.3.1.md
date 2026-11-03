@@ -14,7 +14,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.source
-    image: filebrowser-custom:3.3.1
+    image: kosztyk/filebrowser:3.3.1
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:80" # expose through your TLS reverse proxy
